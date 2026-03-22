@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../../packages/core" },
+    { "path": "../../packages/intake" },
+    { "path": "../../packages/adapters/adapter-exa" },
+    { "path": "../../packages/scoring" },
+    { "path": "../../packages/output/output-json" },
+    { "path": "../../packages/output/output-markdown" },
+    { "path": "../../packages/ai" }
+  ]
+}

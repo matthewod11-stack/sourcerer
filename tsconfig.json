@@ -1,0 +1,13 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/intake" },
+    { "path": "packages/adapters/adapter-exa" },
+    { "path": "packages/scoring" },
+    { "path": "packages/output/output-json" },
+    { "path": "packages/output/output-markdown" },
+    { "path": "packages/ai" },
+    { "path": "apps/cli" }
+  ]
+}

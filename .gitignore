@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# Sourcerer config (contains API keys)
+# Users should NOT commit their config
+# ~/.sourcerer/config.yaml is outside the repo by design
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test
+coverage/
+
+# Turbo
+.turbo/
+
+# Run artifacts (candidate data, PII)
+runs/
+
+# Cache
+.cache/

@@ -1,0 +1,26 @@
+{
+  "name": "@sourcerer/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "sourcerer": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit",
+    "dev": "node --watch dist/index.js",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@sourcerer/core": "workspace:*",
+    "@sourcerer/intake": "workspace:*",
+    "@sourcerer/adapter-exa": "workspace:*",
+    "@sourcerer/scoring": "workspace:*",
+    "@sourcerer/output-json": "workspace:*",
+    "@sourcerer/output-markdown": "workspace:*",
+    "@sourcerer/ai": "workspace:*"
+  }
+}
