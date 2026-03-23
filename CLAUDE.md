@@ -57,6 +57,7 @@ pnpm clean            # Remove all dist/ and tsbuildinfo
 - `docs/specs/2026-03-20-sourcerer-design.md` — Full design specification (reviewed, 2 rounds)
 - `docs/roadmap.md` — Implementation roadmap (validated)
 - `DESIGN-sourcerer-strategy-2026-03-20.md` — Product strategy and business context
+- `PROJECT_STATE.md` — Cross-surface context sync (Claude Chat, Claude Code, Cowork)
 
 ## Conventions
 
