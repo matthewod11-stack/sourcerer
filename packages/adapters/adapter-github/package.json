@@ -1,5 +1,5 @@
 {
-  "name": "@sourcerer/adapter-exa",
+  "name": "@sourcerer/adapter-github",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -19,7 +19,6 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@sourcerer/core": "workspace:*",
-    "exa-js": "^2.8.0"
+    "@sourcerer/core": "workspace:*"
   }
 }

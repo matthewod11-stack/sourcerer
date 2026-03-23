@@ -61,11 +61,14 @@ pnpm clean            # Remove all dist/ and tsbuildinfo
 ## Conventions
 
 - All types live in `@sourcerer/core` and are imported by other packages
+- Core types split into 7 domain files: `identity.ts`, `evidence.ts`, `scoring.ts`, `candidate.ts`, `pipeline.ts`, `ai.ts`, `intake.ts` — barrel re-exported from `index.ts`
 - Each adapter is an independent package with its own tests
 - Evidence grounding: LLM signals can ONLY reference canonical `EvidenceItem.id` values
+- `generateEvidenceId()` in core produces deterministic `ev-XXXXXX` IDs — all adapters use this
 - Identity resolution uses `PersonIdentity` with confidence-based merging
 - PII is tracked per-field with `PIIField` (adapter attribution + retention TTL)
 - Candidate.id === PersonIdentity.canonicalId (one stable identifier)
+- Adapter-keyed data on Candidate uses `Record<string, X>` (not Map) for JSON serialization compatibility
 - No hardcoded API keys — everything via `~/.sourcerer/config.yaml`
 - ESM throughout — `"type": "module"`, `nodenext` module resolution
 - Use `.js` extensions in relative imports (TypeScript resolves `.js` → `.ts`)
@@ -76,4 +79,4 @@ pnpm clean            # Remove all dist/ and tsbuildinfo
 
 Turbo builds in topological order: `core` → 6 packages in parallel → `cli`.
 
-See `docs/roadmap.md` for full phased plan. Currently: Phase 1 (Foundation), 1.1 complete.
+See `docs/roadmap.md` for full phased plan. Currently: Phase 1 (Foundation) COMPLETE. Next: Phase 2 (Onboarding + First Adapter).

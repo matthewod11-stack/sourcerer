@@ -1,0 +1,137 @@
+{
+  "description": "10+ known-duplicate candidates for identity resolution accuracy testing. Same person, different source representations.",
+  "expectedMergeGroups": 4,
+  "expectedTotalAfterDedup": 4,
+
+  "candidates": [
+    {
+      "_group": "Sarah Chen (should merge into 1)",
+      "_sources": ["exa", "github", "hunter"],
+      "variants": [
+        {
+          "name": "Sarah Chen",
+          "adapter": "exa",
+          "identifiers": [
+            { "type": "linkedin_url", "value": "https://www.linkedin.com/in/sarah-chen/" },
+            { "type": "email", "value": "sarah@chainlink.com" },
+            { "type": "name_company", "value": "Sarah Chen|Chainlink" }
+          ]
+        },
+        {
+          "name": "Sarah Chen",
+          "adapter": "github",
+          "identifiers": [
+            { "type": "github_username", "value": "sarahchen" },
+            { "type": "email", "value": "sarah.chen+github@gmail.com" },
+            { "type": "linkedin_url", "value": "https://linkedin.com/in/sarah-chen" }
+          ]
+        },
+        {
+          "name": "S. Chen",
+          "adapter": "hunter",
+          "identifiers": [
+            { "type": "email", "value": "sarah@chainlink.com" }
+          ]
+        }
+      ]
+    },
+    {
+      "_group": "Marcus Rivera (should merge into 1)",
+      "_sources": ["exa", "github"],
+      "variants": [
+        {
+          "name": "Marcus Rivera",
+          "adapter": "exa",
+          "identifiers": [
+            { "type": "linkedin_url", "value": "https://linkedin.com/in/marcus-rivera-dev" },
+            { "type": "personal_url", "value": "https://marcusrivera.dev" },
+            { "type": "name_company", "value": "Marcus Rivera|Alchemy" }
+          ]
+        },
+        {
+          "name": "Marcus Rivera",
+          "adapter": "github",
+          "identifiers": [
+            { "type": "github_username", "value": "https://github.com/MarcusRivera" },
+            { "type": "email", "value": "marcus@protonmail.com" },
+            { "type": "linkedin_url", "value": "https://www.linkedin.com/in/marcus-rivera-dev/" }
+          ]
+        }
+      ]
+    },
+    {
+      "_group": "Aisha Patel (should merge into 1)",
+      "_sources": ["exa", "x", "hunter"],
+      "variants": [
+        {
+          "name": "Aisha Patel",
+          "adapter": "exa",
+          "identifiers": [
+            { "type": "linkedin_url", "value": "https://linkedin.com/in/aisha-patel" },
+            { "type": "email", "value": "aisha.patel@stripe.com" },
+            { "type": "name_company", "value": "Aisha Patel|Stripe" }
+          ]
+        },
+        {
+          "name": "Aisha Patel",
+          "adapter": "x",
+          "identifiers": [
+            { "type": "twitter_handle", "value": "@aisha_builds" },
+            { "type": "email", "value": "aisha.patel@stripe.com" }
+          ]
+        },
+        {
+          "name": "Aisha Patel",
+          "adapter": "hunter",
+          "identifiers": [
+            { "type": "email", "value": "aisha.patel@stripe.com" }
+          ]
+        }
+      ]
+    },
+    {
+      "_group": "James Wilson (single source, no merge needed)",
+      "_sources": ["exa"],
+      "variants": [
+        {
+          "name": "James Wilson",
+          "adapter": "exa",
+          "identifiers": [
+            { "type": "linkedin_url", "value": "https://linkedin.com/in/jameswilson-eng" },
+            { "type": "name_company", "value": "James Wilson|Compound" }
+          ]
+        }
+      ]
+    },
+    {
+      "_group": "Non-merge pair: Sara Chen at Google vs Sarah Chen at Chainlink",
+      "_note": "Similar names but different people — must NOT merge",
+      "variants": [
+        {
+          "name": "Sara Chen",
+          "adapter": "exa",
+          "identifiers": [
+            { "type": "linkedin_url", "value": "https://linkedin.com/in/sara-chen-google" },
+            { "type": "github_username", "value": "sarachen" },
+            { "type": "email", "value": "sara@google.com" },
+            { "type": "name_company", "value": "Sara Chen|Google" }
+          ]
+        }
+      ]
+    }
+  ],
+
+  "assertions": {
+    "totalInputCandidates": 10,
+    "totalAfterDedup": 5,
+    "mergesExpected": [
+      { "group": "Sarah Chen", "inputCount": 3, "outputCount": 1, "mergeConfidence": "high" },
+      { "group": "Marcus Rivera", "inputCount": 2, "outputCount": 1, "mergeConfidence": "high" },
+      { "group": "Aisha Patel", "inputCount": 3, "outputCount": 1, "mergeConfidence": "high" },
+      { "group": "James Wilson", "inputCount": 1, "outputCount": 1, "mergeConfidence": "none" }
+    ],
+    "nonMerges": [
+      { "candidateA": "Sarah Chen (Chainlink)", "candidateB": "Sara Chen (Google)", "reason": "Different LinkedIn, different GitHub, different email" }
+    ]
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "description": "Benchmark role for V1 metric testing",
+  "role": {
+    "title": "Senior Backend Engineer",
+    "company": "Lunar Labs",
+    "companyUrl": "https://lunarlabs.xyz",
+    "industry": "DeFi / Crypto Infrastructure",
+    "level": "senior",
+    "scope": "Own backend infrastructure for a DeFi protocol — indexing, transaction processing, API layer",
+    "location": "San Francisco",
+    "remotePolicy": "hybrid",
+    "compensationRange": { "min": 180000, "max": 250000, "currency": "USD" },
+    "mustHaveSkills": ["Go", "distributed systems", "PostgreSQL"],
+    "niceToHaveSkills": ["Rust", "DeFi/crypto", "Kubernetes", "gRPC"],
+    "teamSize": "10-50 engineers",
+    "reportingTo": "VP of Engineering"
+  },
+  "companyContext": {
+    "techStack": ["Go", "Rust", "Kubernetes", "PostgreSQL", "Redis", "gRPC"],
+    "fundingStage": "Series B",
+    "productCategory": "DeFi Infrastructure",
+    "cultureSignals": ["OSS-friendly", "async-first", "builder culture"],
+    "pitch": "Building the infrastructure layer that makes DeFi accessible to traditional finance"
+  },
+  "scoringWeights": {
+    "technicalDepth": 0.30,
+    "domainRelevance": 0.25,
+    "trajectoryMatch": 0.20,
+    "cultureFit": 0.15,
+    "reachability": 0.10
+  },
+  "tierThresholds": {
+    "tier1MinScore": 70,
+    "tier2MinScore": 40
+  },
+  "knownGoodCandidates": [
+    {
+      "name": "Sarah Chen",
+      "why": "3yr at Chainlink (DeFi infra), deep Go, 2 OSS DeFi libraries, indexing infra experience",
+      "expectedTier": 1,
+      "expectedScoreRange": [75, 90]
+    },
+    {
+      "name": "Marcus Rivera",
+      "why": "5yr backend at Alchemy (crypto), Rust+Go, distributed systems at scale, OSS contributor",
+      "expectedTier": 1,
+      "expectedScoreRange": [70, 85]
+    },
+    {
+      "name": "Aisha Patel",
+      "why": "2yr at Stripe (payments infra), transitioning to crypto, strong Go, conference speaker",
+      "expectedTier": 1,
+      "expectedScoreRange": [65, 80]
+    }
+  ],
+  "knownBadCandidates": [
+    {
+      "name": "Junior Dev",
+      "why": "1yr experience, frontend only, no backend or systems work",
+      "expectedTier": 3,
+      "expectedScoreRange": [10, 30]
+    },
+    {
+      "name": "Enterprise Architect",
+      "why": "15yr Java enterprise, no startup experience, no crypto, no Go/Rust",
+      "expectedTier": 3,
+      "expectedScoreRange": [15, 35]
+    }
+  ]
+}

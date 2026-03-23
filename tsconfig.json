@@ -4,6 +4,7 @@
     { "path": "packages/core" },
     { "path": "packages/intake" },
     { "path": "packages/adapters/adapter-exa" },
+    { "path": "packages/adapters/adapter-github" },
     { "path": "packages/scoring" },
     { "path": "packages/output/output-json" },
     { "path": "packages/output/output-markdown" },
