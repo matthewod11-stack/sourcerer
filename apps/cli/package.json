@@ -17,6 +17,7 @@
   "dependencies": {
     "@inquirer/prompts": "^8.3.2",
     "@sourcerer/adapter-exa": "workspace:*",
+    "@sourcerer/adapter-github": "workspace:*",
     "@sourcerer/ai": "workspace:*",
     "@sourcerer/core": "workspace:*",
     "@sourcerer/intake": "workspace:*",

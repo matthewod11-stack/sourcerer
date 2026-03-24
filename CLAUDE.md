@@ -80,4 +80,4 @@ pnpm clean            # Remove all dist/ and tsbuildinfo
 
 Turbo builds in topological order: `core` → 6 packages in parallel → `cli`.
 
-See `docs/roadmap.md` for full phased plan. Currently: Phase 1 (Foundation) COMPLETE. Next: Phase 2 (Onboarding + First Adapter).
+See `docs/roadmap.md` for full phased plan. Currently: Phases 1-3 COMPLETE. Next: Phase 4 (Enrichment Adapters).

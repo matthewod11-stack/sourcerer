@@ -2,6 +2,33 @@
 
 ---
 
+## Session: 2026-03-24 16:00 — Phases 2.4 through 3C
+
+### Completed
+- **Phase 2.4:** output-json (`JsonOutputAdapter` with metadata envelope) + output-markdown (`MarkdownOutputAdapter` with tier-grouped reports, score tables, evidence links) — 19 + 21 tests
+- **Phase 2.5:** End-to-end smoke test — 4 phase handler factories (discover, enrich, stub-score, output), CLI `run` command (`--config`, `--output`, `--resume`), hand-written test fixtures, 10 e2e tests with mock handlers
+- **Phase 3A:** Intake engine (parallel agent) — conversation engine (11-node graph, save/resume), content research subsystem (5 profile input types), intake phases 1-4 (role context, company intel, success profile, search config gen) — 104 tests
+- **Phase 3B:** AI layer (parallel agent) — Anthropic + OpenAI providers with retry/backoff, template loader with `{{variable}}` interpolation, 6 prompt templates, SHA-256 file-based response cache — 60 tests
+- **Phase 3C:** Integration — content research adapter wrappers (Exa UrlCrawler, GitHub analyzer, similarity searcher), `sourcerer intake` interactive CLI command, `--intake` flag on run command, 7 integration tests
+
+### Stats
+- **Tests:** 171 → 392 passing (+221)
+- **New packages implemented:** output-json, output-markdown, ai (3 fully built), intake (1 fully built)
+- **New CLI commands:** `run`, `intake` (removed from stubs)
+
+### Issues Encountered
+- Worktree isolation caused lockfile mismatch — `zod` installed in agent worktree but missing on main (fixed with `pnpm install`)
+- Vitest `vi.mock('exa-js')` doesn't intercept across monorepo package boundaries — switched to mock handlers for e2e tests
+- Intake conversation flow requires precise response alignment with node confirm/skip lists — `company_confirm` accepts 'looks good' but not 'yes'
+
+### Next Session Should
+- **Phase 4:** Enrichment adapters (adapter-github hardening, adapter-x, adapter-hunter, enrichment orchestrator)
+- Consider adding CI workflow (`.github/workflows/ci.yml`)
+- Run live smoke test with real Exa API key (`SOURCERER_LIVE_TEST=1 pnpm test`)
+- Review intake conversation UX with real AI provider
+
+---
+
 ## Session: 2026-03-24 — GitHub Repo Setup
 
 ### Completed

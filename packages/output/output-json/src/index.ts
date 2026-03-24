@@ -1,2 +1,3 @@
-// @sourcerer/output-json — JSON file output adapter
-export {};
+export { JsonOutputAdapter } from './json-adapter.js';
+export { serializeCandidates } from './serializer.js';
+export type { JsonOutputPayload } from './serializer.js';

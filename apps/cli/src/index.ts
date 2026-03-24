@@ -48,6 +48,20 @@ async function main(): Promise<void> {
     return;
   }
 
+  // Intake command
+  if (command === 'intake') {
+    const { intakeCommand } = await import('./commands/intake.js');
+    await intakeCommand(args.slice(1));
+    return;
+  }
+
+  // Run command
+  if (command === 'run') {
+    const { runCommand } = await import('./commands/run.js');
+    await runCommand(args.slice(1));
+    return;
+  }
+
   // Init command
   if (command === 'init') {
     await runInit();

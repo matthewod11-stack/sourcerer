@@ -19,6 +19,9 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@sourcerer/core": "workspace:*"
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@sourcerer/core": "workspace:*",
+    "openai": "^4.85.0",
+    "zod": "^3.24.0"
   }
 }

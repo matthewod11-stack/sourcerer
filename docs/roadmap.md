@@ -197,22 +197,22 @@ Phase 7: Polish & Advanced ─────────────────�
 
 **Why Phase 2 (not Phase 4):** GitHub is free, fundamental, and used by both intake (success profile analysis of team members) and enrichment. The intake engine's `ContentResearch.analyzeProfile()` for `github_url` input type needs adapter-github to exist. Moving it here eliminates a forward dependency.
 
-### 2.4 output-json + output-markdown
-- [ ] `output-json`: writes `candidates.json` to run directory. Full structured data.
-- [ ] `output-markdown`: generates formatted report grouped by tier with narrative briefs, score breakdowns, evidence links
-- [ ] Both implement `OutputAdapter` interface (push + upsert — for JSON/markdown, upsert overwrites the file)
+### 2.4 output-json + output-markdown ✅ (2026-03-24)
+- [x] `output-json`: writes `candidates.json` to run directory. Full structured data.
+- [x] `output-markdown`: generates formatted report grouped by tier with narrative briefs, score breakdowns, evidence links
+- [x] Both implement `OutputAdapter` interface (push + upsert — for JSON/markdown, upsert overwrites the file)
 - **Acceptance:** Given 10 scored candidates, both outputs produce correct files. Markdown is readable and well-formatted.
 
-### 2.5 End-to-End Smoke Test
-- [ ] `sourcerer run --config test-config.yaml --output json` executes: Exa search → dedup → JSON output
-- [ ] No intake yet (uses a hand-written search config)
-- [ ] Pipeline checkpoints work
-- [ ] Run artifacts are created correctly
-- [ ] `find_similar` unit test with mocked Exa response
-- [ ] GitHub enrichment test with mocked API response
+### 2.5 End-to-End Smoke Test ✅ (2026-03-24)
+- [x] `sourcerer run --config test-config.yaml --output json` executes: Exa search → dedup → JSON output
+- [x] No intake yet (uses a hand-written search config)
+- [x] Pipeline checkpoints work
+- [x] Run artifacts are created correctly
+- [x] `find_similar` unit test with mocked Exa response
+- [x] GitHub enrichment test with mocked API response
 - **Acceptance:** Partial pipeline runs (discovery + dedup + basic enrichment, scoring is stub). Real Exa API key produces valid output. Pipeline can be interrupted and resumed.
 
-**End of Phase 2:** `/checkpoint` — Working end-to-end from config → Exa search → GitHub enrichment → JSON/markdown output.
+**End of Phase 2:** `/checkpoint` ✅ — Working end-to-end from config → Exa search → GitHub enrichment → JSON/markdown output.
 
 ---
 
@@ -225,37 +225,37 @@ Phase 7: Polish & Advanced ─────────────────�
 **Read-only:** `@sourcerer/core` types, `@sourcerer/adapters/adapter-exa`, `@sourcerer/adapters/adapter-github`
 **Sessions:** 3-4
 
-#### 3A.1 Conversation Engine
-- [ ] `ConversationNode` graph implementation
-- [ ] Dynamic prompt generation (LLM crafts follow-ups based on context)
-- [ ] Response parsing (freeform text → structured data via LLM)
-- [ ] Context-aware branching (skip questions already answered by JD paste)
-- [ ] Conversation state serialization (save/resume with `--resume`)
-- [ ] `IntakeContext` accumulator (builds up across phases)
+#### 3A.1 Conversation Engine ✅ (2026-03-24)
+- [x] `ConversationNode` graph implementation
+- [x] Dynamic prompt generation (LLM crafts follow-ups based on context)
+- [x] Response parsing (freeform text → structured data via LLM)
+- [x] Context-aware branching (skip questions already answered by JD paste)
+- [x] Conversation state serialization (save/resume with `--resume`)
+- [x] `IntakeContext` accumulator (builds up across phases)
 - **Acceptance:** A test conversation with 5 nodes executes correctly, branches on context, saves/resumes state.
 
-#### 3A.2 Content Research Subsystem
-- [ ] `ContentResearch` interface implementation
-- [ ] `crawlUrl()` via Exa `search_and_contents()`
-- [ ] `analyzeCompany()` → extracts tech stack, team size, funding stage, culture signals, product category
-- [ ] `analyzeProfile()` for each `ProfileInput` type:
+#### 3A.2 Content Research Subsystem ✅ (2026-03-24)
+- [x] `ContentResearch` interface implementation
+- [x] `crawlUrl()` via Exa `search_and_contents()`
+- [x] `analyzeCompany()` → extracts tech stack, team size, funding stage, culture signals, product category
+- [x] `analyzeProfile()` for each `ProfileInput` type:
   - `github_url` → calls adapter-github (built in Phase 2.3) for repos, languages, contributions
   - `linkedin_url` → Exa semantic lookup (or Pearch if configured)
   - `pasted_text` → LLM structured extraction
   - `name_company` → Exa search to find public profile data
   - `personal_url` → crawl and LLM analyze
-- [ ] `findSimilar()` → Exa `find_similar_and_contents()`
-- [ ] Similarity seeds generation from analyzable team member URLs
+- [x] `findSimilar()` → Exa `find_similar_and_contents()`
+- [x] Similarity seeds generation from analyzable team member URLs
 - **Acceptance:** Given a company URL, returns structured `CompanyIntel`. Given a GitHub URL, returns `ProfileAnalysis` with career patterns and skill signatures.
 
-#### 3A.3 Intake Phases 1-4
-- [ ] Phase 1 (Role Context): JD parsing, structured role parameter extraction, confirmation
-- [ ] Phase 2 (Company Intelligence): company URL analysis via ContentResearch, pitch extraction, competitor identification
-- [ ] Phase 3 (Success Profile): multi-input team member analysis, composite success profile generation, anti-pattern extraction
-- [ ] Phase 4 (Search Config Generation): tiered query generation, scoring weight proposal, enrichment priority, anti-filters
-- [ ] Search config output as YAML, presented for user review/editing in CLI
-- [ ] Talent profile output as JSON
-- [ ] Similarity seeds output as JSON
+#### 3A.3 Intake Phases 1-4 ✅ (2026-03-24)
+- [x] Phase 1 (Role Context): JD parsing, structured role parameter extraction, confirmation
+- [x] Phase 2 (Company Intelligence): company URL analysis via ContentResearch, pitch extraction, competitor identification
+- [x] Phase 3 (Success Profile): multi-input team member analysis, composite success profile generation, anti-pattern extraction
+- [x] Phase 4 (Search Config Generation): tiered query generation, scoring weight proposal, enrichment priority, anti-filters
+- [x] Search config output as YAML, presented for user review/editing in CLI
+- [x] Talent profile output as JSON
+- [x] Similarity seeds output as JSON
 - **Acceptance:** Full intake conversation with real inputs produces a valid `search-config.yaml`, `talent-profile.json`, and `similarity-seeds.json`. User can review and edit the search config before proceeding.
 
 ### Phase 3B: AI Layer (Agent 2)
@@ -263,44 +263,44 @@ Phase 7: Polish & Advanced ─────────────────�
 **Read-only:** `@sourcerer/core` types
 **Sessions:** 1-2
 
-#### 3B.1 Provider Abstraction
-- [ ] `AIProvider` interface implementation
-- [ ] Claude provider (via AI SDK `@ai-sdk/anthropic`)
-- [ ] OpenAI provider (via AI SDK `@ai-sdk/openai`)
-- [ ] `structuredOutput<T>()` with Zod schema validation
-- [ ] Provider selection from config
-- [ ] Error handling: rate limits, token limits, provider outages
+#### 3B.1 Provider Abstraction ✅ (2026-03-24)
+- [x] `AIProvider` interface implementation
+- [x] Claude provider (via `@anthropic-ai/sdk`)
+- [x] OpenAI provider (via `openai` SDK)
+- [x] `structuredOutput<T>()` with Zod schema validation
+- [x] Provider selection from config
+- [x] Error handling: rate limits, token limits, provider outages
 - **Acceptance:** Both Claude and OpenAI providers produce structured output for the same prompt+schema. Provider is selectable from config.
 
-#### 3B.2 Prompt Templates
-- [ ] Template loader (reads `.md` files from `packages/ai/prompts/`)
-- [ ] Variable interpolation (candidate data, talent profile, evidence items)
-- [ ] `intake-role-parse.md`
-- [ ] `intake-company-analyze.md`
-- [ ] `intake-success-profile.md`
-- [ ] `intake-config-generate.md`
-- [ ] `scoring-signal-extract.md` — includes evidence grounding constraint
-- [ ] `scoring-narrative.md` — includes grounding constraint (only cite evidence items)
+#### 3B.2 Prompt Templates ✅ (2026-03-24)
+- [x] Template loader (reads `.md` files from `packages/ai/prompts/`)
+- [x] Variable interpolation (candidate data, talent profile, evidence items)
+- [x] `intake-role-parse.md`
+- [x] `intake-company-analyze.md`
+- [x] `intake-success-profile.md`
+- [x] `intake-config-generate.md`
+- [x] `scoring-signal-extract.md` — includes evidence grounding constraint
+- [x] `scoring-narrative.md` — includes grounding constraint (only cite evidence items)
 - **Acceptance:** All templates load and interpolate correctly. Signal extraction template explicitly constrains to evidence IDs.
 
-#### 3B.3 Response Caching
-- [ ] Cache keyed by SHA-256 of input (prompt + model + schema)
-- [ ] File-based cache in `~/.sourcerer/cache/`
-- [ ] TTL configurable (default: 24h for enrichment-derived, 7d for scoring)
-- [ ] Cache bypass flag (`--no-cache`)
+#### 3B.3 Response Caching ✅ (2026-03-24)
+- [x] Cache keyed by SHA-256 of input (prompt + model + schema)
+- [x] File-based cache in `~/.sourcerer/cache/`
+- [x] TTL configurable (default: 24h for enrichment-derived, 7d for scoring)
+- [x] Cache bypass flag (`--no-cache`)
 - **Acceptance:** Same input returns cached response on second call. Different input doesn't. Cache can be bypassed.
 
-### Phase 3C: Integration (Sequential — merges 3A + 3B)
+### Phase 3C: Integration (Sequential — merges 3A + 3B) ✅ (2026-03-24)
 **Mode:** Sequential. After both agents complete.
 **Sessions:** 1
 
-- [ ] Wire intake engine to use AI layer for all LLM calls
-- [ ] Wire content research to use AI layer for structured extraction
-- [ ] End-to-end test: `sourcerer intake` → full conversation → produces all 3 artifacts
-- [ ] End-to-end test: `sourcerer run` → intake → P0 similarity discovery → Exa search → JSON output
+- [x] Wire intake engine to use AI layer for all LLM calls
+- [x] Wire content research to use AI layer for structured extraction
+- [x] End-to-end test: `sourcerer intake` → full conversation → produces all 3 artifacts
+- [x] End-to-end test: `sourcerer run` → intake → P0 similarity discovery → Exa search → JSON output
 - **Acceptance:** Full pipeline from intake through Exa discovery produces deduplicated candidates with evidence items. Scoring is not yet implemented (stubs return placeholder scores). Intake uses AI layer, not direct API calls.
 
-**End of Phase 3:** `/checkpoint` — Full intake → discovery pipeline working end-to-end.
+**End of Phase 3:** `/checkpoint` ✅ — Full intake → discovery pipeline working end-to-end.
 
 ---
 

@@ -1,0 +1,33 @@
+roleName: "Senior Backend Engineer"
+tiers:
+  - priority: 1
+    queries:
+      - text: "senior backend engineer DeFi distributed systems"
+        maxResults: 5
+        excludeDomains:
+          - linkedin.com
+          - twitter.com
+  - priority: 2
+    queries:
+      - text: "Go engineer blockchain infrastructure"
+        maxResults: 5
+        excludeDomains:
+          - linkedin.com
+scoringWeights:
+  technicalDepth: 0.30
+  domainRelevance: 0.25
+  trajectoryMatch: 0.20
+  cultureFit: 0.15
+  reachability: 0.10
+tierThresholds:
+  tier1MinScore: 70
+  tier2MinScore: 40
+enrichmentPriority:
+  - adapter: github
+    required: false
+    runCondition: always
+antiFilters: []
+maxCandidates: 10
+maxCostUsd: 2.00
+createdAt: "2026-03-24T00:00:00Z"
+version: 1

@@ -1,8 +1,6 @@
 // Stub commands — print "not yet implemented" for unbuilt commands
 
 const STUB_COMMANDS = [
-  'intake',
-  'run',
   'discover',
   'enrich',
   'score',

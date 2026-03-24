@@ -1,0 +1,34 @@
+{
+  "role": {
+    "title": "Senior Backend Engineer",
+    "level": "Senior",
+    "scope": "Backend infrastructure for DeFi protocols",
+    "remotePolicy": "remote",
+    "mustHaveSkills": ["Go", "distributed systems", "blockchain"],
+    "niceToHaveSkills": ["Rust", "Solidity", "Kubernetes"]
+  },
+  "company": {
+    "name": "Test DeFi Startup",
+    "url": "https://example-defi.com",
+    "techStack": ["Go", "Rust", "PostgreSQL", "Kubernetes"],
+    "fundingStage": "Series A",
+    "productCategory": "DeFi",
+    "cultureSignals": ["remote-first", "open-source contributors preferred"],
+    "analyzedAt": "2026-03-24T00:00:00Z"
+  },
+  "successPatterns": {
+    "careerTrajectories": [],
+    "skillSignatures": ["Go", "distributed systems", "blockchain", "smart contracts"],
+    "seniorityCalibration": "5+ years backend, 2+ years crypto/DeFi",
+    "cultureSignals": ["open-source", "remote-first"]
+  },
+  "antiPatterns": ["no backend experience", "only frontend"],
+  "competitorMap": {
+    "targetCompanies": ["Chainlink", "Uniswap", "Aave", "Compound"],
+    "avoidCompanies": [],
+    "competitorReason": {
+      "Chainlink": "Oracle infrastructure, similar backend challenges"
+    }
+  },
+  "createdAt": "2026-03-24T00:00:00Z"
+}

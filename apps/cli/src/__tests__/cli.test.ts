@@ -128,8 +128,6 @@ describe('Help command', () => {
 
 describe('Stub commands', () => {
   it('isStubCommand recognizes valid commands', () => {
-    expect(isStubCommand('run')).toBe(true);
-    expect(isStubCommand('intake')).toBe(true);
     expect(isStubCommand('candidates')).toBe(true);
   });
 
