@@ -231,8 +231,8 @@ Output: JSON, Markdown, CSV, Notion (push to existing workflow tools)
 
 ## Cross-Surface Notes
 
-- **Repo is private** on GitHub. No deployment — CLI tool runs locally.
-- **2 git commits** on main: monorepo scaffold (Phase 1.1) + all of Phase 1 + Phase 2.1-2.3.
+- **Repo is private** on GitHub (`matthewod11-stack/sourcerer`). No deployment — CLI tool runs locally.
+- **4 git commits** on main: monorepo scaffold (Phase 1.1) + Phase 1 + Phase 2.1-2.3 + PROJECT_STATE.md + GitHub polish (README, MIT license).
 - **Build command**: `pnpm build` (Turbo, topological). **Test command**: `pnpm test` (171 tests, all passing).
 - **Config file**: `~/.sourcerer/config.yaml` — API keys for Exa, GitHub, AI provider. Created by `sourcerer init`.
 - **Run artifacts**: written to `runs/YYYY-MM-DD-<role>/` with `run-meta.json`, checkpoints, candidate data.

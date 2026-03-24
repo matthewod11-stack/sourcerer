@@ -2,6 +2,62 @@
 
 ---
 
+## Session: 2026-03-23 (cont.) — Phase 1.3: Identity Resolution Engine
+
+### Completed
+- Implemented `IdentityResolver` class in `@sourcerer/core` with 4-pass merge algorithm:
+  - Pass 1: High-confidence index-based merges (LinkedIn URL, email, GitHub username)
+  - Pass 2: Cross-source email linking (same email from different adapters)
+  - Pass 3: Medium-confidence (same name + same company, different sources)
+  - Pass 4: Low-confidence (similar name + similar company) — collected as `PendingMerge`, not auto-applied
+- Deterministic `canonicalId` generation via SHA-256 hash of sorted normalized identifiers (UUID format)
+- Normalization functions for all 6 identifier types (LinkedIn URL, email, GitHub, Twitter, personal_url, name_company)
+  - Gmail dot/plus normalization, LinkedIn hyphen stripping, GitHub URL/handle normalization
+- `namesMatch()` with first/last reorder, `namesSimilar()` via Levenshtein distance
+- `name_company` value format convention: pipe separator `"Name|Company"`
+- Exported types: `MergeRule`, `MergeReason`, `MergeDecision`, `PendingMerge`, `ResolveResult`
+- 48 tests covering all merge rules, normalization, acceptance criteria, edge cases
+- Total: 69 tests passing (21 from Phase 1.2 + 48 new), 0 failures
+
+### Design Decisions
+- `node:crypto` for SHA-256 hashing (zero external deps, Node 22+)
+- `name_company` excluded from canonicalId hash (too volatile), with fallback if no other identifiers exist
+- Low-confidence merges collected but NOT applied in V1 (conservative default per risk register)
+- O(n²) pairwise comparison acceptable for V1 scale (50-200 candidates)
+
+### Next Session Should
+- Build pipeline runner with checkpoint/resume (Phase 1.4)
+- Build config system (Phase 1.5)
+- Build CLI skeleton (Phase 1.6)
+
+---
+
+## Session: 2026-03-23 — Phase 1.2: Core Interfaces
+
+### Completed
+- Defined all core types and interfaces in `@sourcerer/core` (7 domain files + barrel index)
+- File organization: `identity.ts`, `evidence.ts`, `scoring.ts`, `candidate.ts`, `pipeline.ts`, `ai.ts`, `intake.ts`
+- ~40 exported types/interfaces covering: identity resolution, evidence grounding, candidate lifecycle, scoring, pipeline adapters, AI provider, intake engine, search config, talent profile
+- `generateEvidenceId()` — deterministic `ev-XXXXXX` ID generation (djb2 hash, zero deps)
+- Design decision: `Record<string, X>` over `Map<string, X>` for JSON serialization compatibility
+- `ScoredCandidate extends Candidate` with required score fields for type-safe output adapters
+- `EnrichmentResult` co-located in `candidate.ts` to avoid circular imports
+- 21 acceptance tests passing: type construction, evidence ID determinism, grounding constraint validation
+- All 15 typecheck tasks pass, all 16 test tasks pass, all 8 build tasks pass
+
+### Design Decisions
+- `Record` over `Map` for adapter-keyed data (JSON serialization)
+- `AIProvider.structuredOutput` schema typed as `unknown` (core is zero-dep, narrowed in `@sourcerer/ai`)
+- Evidence grounding encoded in types: `ScoreComponent.evidenceIds` and `RedFlag.evidenceId` reference `EvidenceItem.id`
+
+### Next Session Should
+- Build identity resolution engine (Phase 1.3) — `IdentityResolver` class with confidence-based merging
+- Build pipeline runner with checkpoint/resume (Phase 1.4)
+- Build config system (Phase 1.5)
+- Build CLI skeleton (Phase 1.6)
+
+---
+
 ## Session: 2026-03-22 14:00 — Phase 1.1: Monorepo Scaffold
 
 ### Completed
