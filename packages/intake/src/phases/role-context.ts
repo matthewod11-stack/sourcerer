@@ -10,6 +10,7 @@ import type {
 
 import { TERMINAL_NODE } from '../conversation-engine.js';
 import { hasRoleData } from '../intake-context.js';
+import { RoleParametersSchema } from '../schemas.js';
 
 /**
  * Creates Phase 1 conversation nodes for role context gathering.
@@ -63,7 +64,7 @@ If information is not available, omit the field. Be thorough in extracting skill
 
         const roleParams = await aiProvider.structuredOutput<RoleParameters>(
           messages,
-          { schema: {} as unknown },
+          { schema: RoleParametersSchema },
         );
 
         return {
@@ -179,7 +180,7 @@ ${JSON.stringify(currentParams, null, 2)}`,
 
         const updatedParams = await aiProvider.structuredOutput<RoleParameters>(
           messages,
-          { schema: {} as unknown },
+          { schema: RoleParametersSchema },
         );
 
         return {

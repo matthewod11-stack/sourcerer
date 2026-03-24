@@ -19,6 +19,7 @@ import type {
 } from '@sourcerer/core';
 
 import { TERMINAL_NODE } from '../conversation-engine.js';
+import { SearchQueryTierArraySchema, ScoringWeightsSchema, AdjustmentsSchema } from '../schemas.js';
 
 /**
  * Generates tiered search queries from the intake context.
@@ -65,7 +66,7 @@ Team profiles: ${context.teamProfiles ? `${context.teamProfiles.length} analyzed
 
   return aiProvider.structuredOutput<SearchQueryTier[]>(
     messages,
-    { schema: {} as unknown },
+    { schema: SearchQueryTierArraySchema },
   );
 }
 
@@ -98,7 +99,7 @@ Must-have skills: ${JSON.stringify(context.roleParameters?.mustHaveSkills ?? [])
 
   return aiProvider.structuredOutput<ScoringWeights>(
     messages,
-    { schema: {} as unknown },
+    { schema: ScoringWeightsSchema },
   );
 }
 
@@ -169,11 +170,12 @@ export function buildTalentProfile(context: IntakeContext): TalentProfile {
   }
 
   const profiles = context.teamProfiles ?? [];
+  const composite = context.compositeProfile;
 
   return {
     role,
     company,
-    successPatterns: {
+    successPatterns: composite ?? {
       careerTrajectories: profiles.map(p => p.careerTrajectory),
       skillSignatures: dedupeStrings(profiles.flatMap(p => p.skillSignatures)),
       seniorityCalibration: profiles[0]?.seniorityLevel ?? role.level,
@@ -336,7 +338,7 @@ If their request relates to role parameters, company info, or team data, indicat
 
         const adjustments = await aiProvider.structuredOutput<Record<string, unknown>>(
           messages,
-          { schema: {} as unknown },
+          { schema: AdjustmentsSchema },
         );
 
         // Apply simple adjustments to context

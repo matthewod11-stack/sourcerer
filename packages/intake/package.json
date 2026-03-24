@@ -19,6 +19,7 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
-    "@sourcerer/core": "workspace:*"
+    "@sourcerer/core": "workspace:*",
+    "zod": "^3.24.0"
   }
 }

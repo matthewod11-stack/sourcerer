@@ -188,8 +188,10 @@ export class ExaAdapter implements DataSource {
 
     for (const candidate of candidates) {
       try {
+        await this.limiter.acquire();
         const result = await this.enrich(candidate);
         succeeded.push({ candidateId: candidate.id, result });
+        totalCost += COST_PER_SEARCH_ESTIMATE;
       } catch (err) {
         const is429 = err instanceof Error && err.message.includes('429');
         failed.push({

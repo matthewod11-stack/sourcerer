@@ -36,6 +36,7 @@ export function mergeContextUpdates(
   if (updates.companyUrl !== undefined) merged.companyUrl = updates.companyUrl;
   if (updates.companyIntel !== undefined) merged.companyIntel = updates.companyIntel;
   if (updates.competitorMap !== undefined) merged.competitorMap = updates.competitorMap;
+  if (updates.compositeProfile !== undefined) merged.compositeProfile = updates.compositeProfile;
   if (updates.talentProfile !== undefined) merged.talentProfile = updates.talentProfile;
 
   // Array fields — concatenate

@@ -7,6 +7,7 @@ import type {
   AIProvider,
   Candidate,
 } from '@sourcerer/core';
+import { ProfileAnalysisPartialSchema } from '@sourcerer/intake';
 import type { ExaAdapter } from '@sourcerer/adapter-exa';
 import type { GitHubAdapter } from '@sourcerer/adapter-github';
 import type {
@@ -90,7 +91,7 @@ export function createGitHubAnalyzer(
         skillSignatures: string[];
         seniorityLevel?: string;
         cultureSignals: string[];
-      }>(messages, { schema: {} as unknown });
+      }>(messages, { schema: ProfileAnalysisPartialSchema });
 
       return {
         inputType: 'github_url',

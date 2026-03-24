@@ -17,6 +17,15 @@ vi.mock('../provider-openai.js', () => ({
   })),
 }));
 
+// Mock ResponseCache to avoid file system operations
+vi.mock('../response-cache.js', () => ({
+  ResponseCache: vi.fn().mockImplementation(() => ({
+    get: vi.fn(),
+    set: vi.fn(),
+  })),
+  generateCacheKey: vi.fn().mockReturnValue('mock-key'),
+}));
+
 function makeConfig(overrides: Partial<SourcererConfig['aiProvider']> = {}): SourcererConfig {
   return {
     version: 1,
@@ -38,10 +47,9 @@ describe('createAIProvider', () => {
     const { AnthropicProvider } = await import('../provider-anthropic.js');
     const provider = createAIProvider(makeConfig({ name: 'anthropic' }));
 
-    expect(AnthropicProvider).toHaveBeenCalledWith({
-      apiKey: 'test-api-key',
-      model: undefined,
-    });
+    expect(AnthropicProvider).toHaveBeenCalledWith(
+      expect.objectContaining({ apiKey: 'test-api-key' }),
+    );
     expect(provider.name).toBe('anthropic');
   });
 
@@ -49,10 +57,9 @@ describe('createAIProvider', () => {
     const { OpenAIProvider } = await import('../provider-openai.js');
     const provider = createAIProvider(makeConfig({ name: 'openai' }));
 
-    expect(OpenAIProvider).toHaveBeenCalledWith({
-      apiKey: 'test-api-key',
-      model: undefined,
-    });
+    expect(OpenAIProvider).toHaveBeenCalledWith(
+      expect.objectContaining({ apiKey: 'test-api-key' }),
+    );
     expect(provider.name).toBe('openai');
   });
 
@@ -60,10 +67,12 @@ describe('createAIProvider', () => {
     const { AnthropicProvider } = await import('../provider-anthropic.js');
     createAIProvider(makeConfig({ name: 'anthropic', model: 'claude-opus-4-20250514' }));
 
-    expect(AnthropicProvider).toHaveBeenCalledWith({
-      apiKey: 'test-api-key',
-      model: 'claude-opus-4-20250514',
-    });
+    expect(AnthropicProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        apiKey: 'test-api-key',
+        model: 'claude-opus-4-20250514',
+      }),
+    );
   });
 
   it('throws for unknown provider', () => {
@@ -71,5 +80,23 @@ describe('createAIProvider', () => {
     (config.aiProvider as any).name = 'unknown-provider';
 
     expect(() => createAIProvider(config)).toThrow('Unknown AI provider');
+  });
+
+  it('passes cache when noCache is not set', async () => {
+    const { AnthropicProvider } = await import('../provider-anthropic.js');
+    createAIProvider(makeConfig({ name: 'anthropic' }));
+
+    expect(AnthropicProvider).toHaveBeenCalledWith(
+      expect.objectContaining({ cache: expect.anything() }),
+    );
+  });
+
+  it('does not pass cache when noCache is true', async () => {
+    const { AnthropicProvider } = await import('../provider-anthropic.js');
+    createAIProvider(makeConfig({ name: 'anthropic' }), { noCache: true });
+
+    expect(AnthropicProvider).toHaveBeenCalledWith(
+      expect.objectContaining({ cache: undefined }),
+    );
   });
 });

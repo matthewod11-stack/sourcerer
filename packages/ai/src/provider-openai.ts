@@ -8,6 +8,8 @@ import type {
   ChatOptions,
   StructuredOutputOptions,
 } from '@sourcerer/core';
+import type { ResponseCache } from './response-cache.js';
+import { generateCacheKey } from './response-cache.js';
 
 /** Default model for the OpenAI provider */
 const DEFAULT_MODEL = 'gpt-4o';
@@ -20,6 +22,7 @@ export interface OpenAIProviderConfig {
   apiKey: string;
   model?: string;
   baseURL?: string;
+  cache?: ResponseCache;
 }
 
 /**
@@ -92,6 +95,7 @@ export class OpenAIProvider implements AIProvider {
   readonly name = 'openai';
   private readonly client: OpenAI;
   private readonly defaultModel: string;
+  private readonly cache?: ResponseCache;
 
   constructor(config: OpenAIProviderConfig) {
     this.client = new OpenAI({
@@ -99,10 +103,19 @@ export class OpenAIProvider implements AIProvider {
       ...(config.baseURL ? { baseURL: config.baseURL } : {}),
     });
     this.defaultModel = config.model ?? DEFAULT_MODEL;
+    this.cache = config.cache;
   }
 
   async chat(messages: Message[], options?: ChatOptions): Promise<string> {
     const model = options?.model ?? this.defaultModel;
+
+    // Check cache
+    if (this.cache) {
+      const promptText = messages.map((m) => `${m.role}:${m.content}`).join('\n');
+      const cacheKey = generateCacheKey(promptText, model);
+      const cached = await this.cache.get(cacheKey);
+      if (cached) return cached;
+    }
 
     const response = await withRetry(
       () =>
@@ -122,7 +135,16 @@ export class OpenAIProvider implements AIProvider {
       3,
     );
 
-    return response.choices[0]?.message?.content ?? '';
+    const result = response.choices[0]?.message?.content ?? '';
+
+    // Store in cache
+    if (this.cache) {
+      const promptText = messages.map((m) => `${m.role}:${m.content}`).join('\n');
+      const cacheKey = generateCacheKey(promptText, model);
+      await this.cache.set(cacheKey, result, model);
+    }
+
+    return result;
   }
 
   async structuredOutput<T>(

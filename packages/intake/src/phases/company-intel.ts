@@ -11,6 +11,7 @@ import type {
 } from '@sourcerer/core';
 
 import { hasCompanyData } from '../intake-context.js';
+import { CompanyIntelPartialSchema, CompetitorMapSchema } from '../schemas.js';
 
 /**
  * Creates Phase 2 conversation nodes for company intelligence gathering.
@@ -26,6 +27,9 @@ export function createCompanyIntelNodes(
   contentResearch: ContentResearch,
   nextPhaseNodeId: string,
 ): ConversationNode[] {
+  // Closure variable to pass crawled intel from prompt() to parse()
+  let lastCrawledIntel: CompanyIntel | null = null;
+
   return [
     // Node 1: Ask for company URL
     {
@@ -67,8 +71,8 @@ export function createCompanyIntelNodes(
           const content = await contentResearch.crawlUrl(url);
           const intel = await contentResearch.analyzeCompany(content);
 
-          // Store the result in a way the parse function can access it
-          // We return the analysis as part of the prompt for the user to review
+          // Store in closure so parse() can access without re-crawling
+          lastCrawledIntel = { ...intel, url, analyzedAt: new Date().toISOString() };
           const lines = [
             `I've analyzed **${intel.name}**:\n`,
             `**Product:** ${intel.productCategory ?? 'Unknown'}`,
@@ -99,10 +103,11 @@ export function createCompanyIntelNodes(
           phrase => normalized.includes(phrase),
         ) || /^y$/i.test(normalized);
 
-        if (isConfirmed && context.companyIntel) {
+        if (isConfirmed && (lastCrawledIntel || context.companyIntel)) {
+          const intel = lastCrawledIntel ?? context.companyIntel!;
           return {
             structured: { confirmed: true },
-            contextUpdates: {},
+            contextUpdates: { companyIntel: intel },
             followUpNeeded: false,
           };
         }
@@ -131,7 +136,7 @@ ${context.companyIntel ? `Existing analysis:\n${JSON.stringify(context.companyIn
 
         const intel = await aiProvider.structuredOutput<Omit<CompanyIntel, 'url' | 'analyzedAt'>>(
           messages,
-          { schema: {} as unknown },
+          { schema: CompanyIntelPartialSchema },
         );
 
         const fullIntel: CompanyIntel = {
@@ -207,7 +212,7 @@ Existing competitors from analysis: ${JSON.stringify(context.companyIntel?.compe
 
         const map = await aiProvider.structuredOutput<CompetitorMap>(
           messages,
-          { schema: {} as unknown },
+          { schema: CompetitorMapSchema },
         );
 
         return {

@@ -50,6 +50,8 @@ export function createEnrichHandler(adapters: {
       const candidates = [...input.candidates];
       let costIncurred = 0;
 
+      const allFailures: { item: string; error: string; retryable: boolean }[] = [];
+
       for (const adapter of Object.values(adapters)) {
         if (!adapter) continue;
 
@@ -67,11 +69,20 @@ export function createEnrichHandler(adapters: {
             candidate.sources[result.adapter] = result.sourceData;
           }
         }
+
+        for (const failure of batch.failed) {
+          allFailures.push({
+            item: failure.candidateId,
+            error: failure.error.message,
+            retryable: failure.retryable,
+          });
+        }
       }
 
       return {
-        status: 'completed',
+        status: allFailures.length > 0 ? 'partial' : 'completed',
         data: { candidates, costIncurred },
+        failures: allFailures.length > 0 ? allFailures : undefined,
         costIncurred,
       };
     },

@@ -12,6 +12,12 @@ export interface IntakeContext {
   companyUrl?: string;
   companyIntel?: CompanyIntel;
   teamProfiles?: ProfileAnalysis[];
+  compositeProfile?: {
+    careerTrajectories: CareerStep[][];
+    skillSignatures: string[];
+    seniorityCalibration: string;
+    cultureSignals: string[];
+  };
   antiPatterns?: string[];
   competitorMap?: CompetitorMap;
   talentProfile?: TalentProfile;

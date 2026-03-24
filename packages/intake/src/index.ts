@@ -55,6 +55,9 @@ export {
   buildSearchConfig,
 } from './phases/search-config-gen.js';
 
+// Schemas (for use by CLI content-research adapters)
+export { ProfileAnalysisPartialSchema } from './schemas.js';
+
 // Intake Runner
 export {
   buildIntakeGraph,

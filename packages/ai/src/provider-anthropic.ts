@@ -8,6 +8,8 @@ import type {
   ChatOptions,
   StructuredOutputOptions,
 } from '@sourcerer/core';
+import type { ResponseCache } from './response-cache.js';
+import { generateCacheKey } from './response-cache.js';
 
 /** Default model for the Anthropic provider */
 const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
@@ -20,6 +22,7 @@ export interface AnthropicProviderConfig {
   apiKey: string;
   model?: string;
   baseURL?: string;
+  cache?: ResponseCache;
 }
 
 /**
@@ -102,6 +105,7 @@ export class AnthropicProvider implements AIProvider {
   readonly name = 'anthropic';
   private readonly client: Anthropic;
   private readonly defaultModel: string;
+  private readonly cache?: ResponseCache;
 
   constructor(config: AnthropicProviderConfig) {
     this.client = new Anthropic({
@@ -109,10 +113,20 @@ export class AnthropicProvider implements AIProvider {
       ...(config.baseURL ? { baseURL: config.baseURL } : {}),
     });
     this.defaultModel = config.model ?? DEFAULT_MODEL;
+    this.cache = config.cache;
   }
 
   async chat(messages: Message[], options?: ChatOptions): Promise<string> {
     const model = options?.model ?? this.defaultModel;
+
+    // Check cache
+    if (this.cache) {
+      const promptText = messages.map((m) => `${m.role}:${m.content}`).join('\n');
+      const cacheKey = generateCacheKey(promptText, model);
+      const cached = await this.cache.get(cacheKey);
+      if (cached) return cached;
+    }
+
     const { system, messages: apiMessages } = splitMessages(messages);
 
     const response = await withRetry(
@@ -132,7 +146,16 @@ export class AnthropicProvider implements AIProvider {
     const textBlocks = response.content.filter(
       (block) => block.type === 'text',
     );
-    return textBlocks.map((block) => block.text).join('');
+    const result = textBlocks.map((block) => block.text).join('');
+
+    // Store in cache
+    if (this.cache) {
+      const promptText = messages.map((m) => `${m.role}:${m.content}`).join('\n');
+      const cacheKey = generateCacheKey(promptText, model);
+      await this.cache.set(cacheKey, result, model);
+    }
+
+    return result;
   }
 
   async structuredOutput<T>(

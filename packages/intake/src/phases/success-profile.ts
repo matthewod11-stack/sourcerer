@@ -13,6 +13,7 @@ import type {
 
 import { hasTeamProfiles } from '../intake-context.js';
 import { extractSimilaritySeeds } from '../content-research.js';
+import { CompositeProfileSchema, AntiPatternsSchema } from '../schemas.js';
 
 /**
  * Parses a multi-line input of team member references into ProfileInput objects.
@@ -103,7 +104,7 @@ export async function buildCompositeProfile(
     skillSignatures: string[];
     seniorityCalibration: string;
     cultureSignals: string[];
-  }>(messages, { schema: {} as unknown });
+  }>(messages, { schema: CompositeProfileSchema });
 }
 
 /**
@@ -227,7 +228,7 @@ export function createSuccessProfileNodes(
 
         return {
           structured: { compositeProfile: composite },
-          contextUpdates: {},
+          contextUpdates: { compositeProfile: composite },
           followUpNeeded: false,
         };
       },
@@ -270,7 +271,7 @@ export function createSuccessProfileNodes(
 
         const patterns = await aiProvider.structuredOutput<string[]>(
           messages,
-          { schema: {} as unknown },
+          { schema: AntiPatternsSchema },
         );
 
         return {

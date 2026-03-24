@@ -2,6 +2,31 @@
 
 ---
 
+## Session: 2026-03-24 18:00 — Hardening Pass (6 Fixes)
+
+### Completed
+- **Fix 1:** Real Zod schemas — replaced all 14 `{ schema: {} as unknown }` call sites with proper Zod validation schemas (10 schema types in `packages/intake/src/schemas.ts`)
+- **Fix 2:** Preserved crawl result — `company_analysis` node now stores crawled intel via closure variable instead of discarding it when user confirms
+- **Fix 3:** Persisted composite profile — added `compositeProfile` field to `IntakeContext`, `team_analysis.parse()` now stores AI-synthesized profile in context, `buildTalentProfile()` uses it
+- **Fix 4:** Wired response cache — both providers (Anthropic, OpenAI) now check/store cache before/after API calls, `createAIProvider()` creates cache by default, `--no-cache` flag on CLI
+- **Fix 5:** Guarded CLI resume — `run --resume` now loads searchConfig from checkpoint when `--config` not provided, clear error message if neither available
+- **Fix 6:** Enrichment cost/failure reporting — `ExaAdapter.enrichBatch()` tracks cost per call, `createEnrichHandler()` reports `batch.failed` and returns `status: 'partial'`
+
+### Stats
+- **Tests:** 392 → 394 passing (+2 new factory tests for cache wiring)
+- **Files modified:** 15 (across core, intake, ai, adapters, cli)
+- **New file:** `packages/intake/src/schemas.ts`
+
+### Issues Encountered
+- Vercel plugin keeps flagging direct Anthropic/OpenAI SDK imports as errors — false positives for this CLI project (not a Vercel web app)
+
+### Next Session Should
+- **Phase 4:** Enrichment adapters (adapter-github hardening, adapter-x, adapter-hunter, enrichment orchestrator)
+- Run live smoke test with real API keys to validate the hardening fixes end-to-end
+- Consider adding CI workflow (`.github/workflows/ci.yml`)
+
+---
+
 ## Session: 2026-03-24 16:00 — Phases 2.4 through 3C
 
 ### Completed

@@ -25,22 +25,26 @@ import {
 function parseArgs(args: string[]): {
   resumePath?: string;
   outputDir: string;
+  noCache: boolean;
 } {
   let resumePath: string | undefined;
   let outputDir = process.cwd();
+  let noCache = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--resume' && args[i + 1]) {
       resumePath = args[++i];
     } else if (args[i] === '--output-dir' && args[i + 1]) {
       outputDir = args[++i];
+    } else if (args[i] === '--no-cache') {
+      noCache = true;
     } else if (args[i] === '--help' || args[i] === '-h') {
       printUsage();
-      return { outputDir };
+      return { outputDir, noCache: false };
     }
   }
 
-  return { resumePath, outputDir };
+  return { resumePath, outputDir, noCache };
 }
 
 function printUsage(): void {
@@ -69,7 +73,7 @@ export async function intakeCommand(args: string[]): Promise<void> {
   const config = await loadConfigFromDisk();
 
   // Create dependencies
-  const aiProvider = createAIProvider(config);
+  const aiProvider = createAIProvider(config, { noCache: parsed.noCache });
   const exa = new ExaAdapter(config.adapters.exa.apiKey);
   const github = new GitHubAdapter(process.env.GITHUB_TOKEN);
 

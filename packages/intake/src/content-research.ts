@@ -9,6 +9,7 @@ import type {
   SimilarResult,
   AIProvider,
 } from '@sourcerer/core';
+import { CompanyIntelPartialSchema, ProfileAnalysisPartialSchema } from './schemas.js';
 
 // --- Dependency Interfaces ---
 
@@ -94,7 +95,7 @@ export class ContentResearchEngine implements ContentResearch {
 
     const result = await this.ai.structuredOutput<Omit<CompanyIntel, 'url' | 'analyzedAt'>>(
       messages,
-      { schema: {} as unknown },
+      { schema: CompanyIntelPartialSchema },
     );
 
     return {
@@ -174,7 +175,7 @@ export class ContentResearchEngine implements ContentResearch {
       skillSignatures: string[];
       seniorityLevel?: string;
       cultureSignals: string[];
-    }>(messages, { schema: {} as unknown });
+    }>(messages, { schema: ProfileAnalysisPartialSchema });
 
     return {
       inputType: 'pasted_text',
@@ -214,7 +215,7 @@ export class ContentResearchEngine implements ContentResearch {
       skillSignatures: string[];
       seniorityLevel?: string;
       cultureSignals: string[];
-    }>(messages, { schema: {} as unknown });
+    }>(messages, { schema: ProfileAnalysisPartialSchema });
 
     return {
       inputType: 'name_company',
@@ -265,7 +266,7 @@ export class ContentResearchEngine implements ContentResearch {
       skillSignatures: string[];
       seniorityLevel?: string;
       cultureSignals: string[];
-    }>(messages, { schema: {} as unknown });
+    }>(messages, { schema: ProfileAnalysisPartialSchema });
 
     return {
       inputType,

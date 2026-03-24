@@ -6,6 +6,7 @@ import chalk from 'chalk';
 import {
   PipelineRunner,
   createDedupHandler,
+  loadCheckpoint,
   type SearchConfig,
   type TalentProfile,
   type OutputAdapter,
@@ -27,10 +28,12 @@ function parseArgs(args: string[]): {
   outputFormats: string[];
   resumeFrom?: string;
   useIntake: boolean;
+  noCache: boolean;
 } {
   let configPath: string | undefined;
   let resumeFrom: string | undefined;
   let useIntake = false;
+  let noCache = false;
   const outputFormats: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -42,13 +45,15 @@ function parseArgs(args: string[]): {
       resumeFrom = args[++i];
     } else if (args[i] === '--intake') {
       useIntake = true;
+    } else if (args[i] === '--no-cache') {
+      noCache = true;
     } else if (args[i] === '--help' || args[i] === '-h') {
       printUsage();
-      return { outputFormats: [], useIntake: false };
+      return { outputFormats: [], useIntake: false, noCache: false };
     }
   }
 
-  return { configPath, outputFormats, resumeFrom, useIntake };
+  return { configPath, outputFormats, resumeFrom, useIntake, noCache };
 }
 
 function printUsage(): void {
@@ -132,6 +137,20 @@ export async function runCommand(args: string[]): Promise<void> {
         },
         createdAt: new Date().toISOString(),
       };
+    }
+  }
+
+  // When resuming without --config, try loading searchConfig from checkpoint
+  if (parsed.resumeFrom && !searchConfig) {
+    const checkpoint = await loadCheckpoint(parsed.resumeFrom);
+    if (checkpoint?.phaseOutputs.intake) {
+      searchConfig = checkpoint.phaseOutputs.intake.searchConfig;
+      talentProfile = checkpoint.phaseOutputs.intake.talentProfile;
+    }
+    if (!searchConfig) {
+      console.error(chalk.red('Resume requires --config <path> when no intake phase was run previously.'));
+      process.exitCode = 1;
+      return;
     }
   }
 
