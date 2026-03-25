@@ -7,12 +7,15 @@ import {
   PipelineRunner,
   createDedupHandler,
   loadCheckpoint,
+  getAdapterApiKey,
   type SearchConfig,
   type TalentProfile,
   type OutputAdapter,
 } from '@sourcerer/core';
 import { ExaAdapter } from '@sourcerer/adapter-exa';
 import { GitHubAdapter } from '@sourcerer/adapter-github';
+import { XAdapter } from '@sourcerer/adapter-x';
+import { HunterAdapter } from '@sourcerer/adapter-hunter';
 import { JsonOutputAdapter } from '@sourcerer/output-json';
 import { MarkdownOutputAdapter } from '@sourcerer/output-markdown';
 import { loadConfigFromDisk, configFileExists } from '../config-io.js';
@@ -160,6 +163,12 @@ export async function runCommand(args: string[]): Promise<void> {
   const githubToken = process.env.GITHUB_TOKEN;
   const github = new GitHubAdapter(githubToken);
 
+  const xApiKey = getAdapterApiKey(sourcererConfig, 'x');
+  const x = xApiKey ? new XAdapter(xApiKey) : undefined;
+
+  const hunterApiKey = getAdapterApiKey(sourcererConfig, 'hunter');
+  const hunter = hunterApiKey ? new HunterAdapter(hunterApiKey) : undefined;
+
   // Determine output formats
   const formats =
     parsed.outputFormats.length > 0
@@ -181,7 +190,10 @@ export async function runCommand(args: string[]): Promise<void> {
   const runner = new PipelineRunner({
     discover: createDiscoverHandler(exa),
     dedup: createDedupHandler(),
-    enrich: createEnrichHandler({ exa, github }),
+    enrich: createEnrichHandler({ exa, github, x, hunter }, {
+      enrichmentPriority: searchConfig?.enrichmentPriority,
+      maxCostUsd: searchConfig?.maxCostUsd,
+    }),
     score: createStubScoreHandler(searchConfig!),
     output: createOutputHandler(outputAdapters),
   });

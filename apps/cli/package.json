@@ -18,6 +18,8 @@
     "@inquirer/prompts": "^8.3.2",
     "@sourcerer/adapter-exa": "workspace:*",
     "@sourcerer/adapter-github": "workspace:*",
+    "@sourcerer/adapter-hunter": "workspace:*",
+    "@sourcerer/adapter-x": "workspace:*",
     "@sourcerer/ai": "workspace:*",
     "@sourcerer/core": "workspace:*",
     "@sourcerer/intake": "workspace:*",

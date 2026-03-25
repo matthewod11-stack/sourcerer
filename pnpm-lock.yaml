@@ -35,6 +35,12 @@ importers:
       '@sourcerer/adapter-github':
         specifier: workspace:*
         version: link:../../packages/adapters/adapter-github
+      '@sourcerer/adapter-hunter':
+        specifier: workspace:*
+        version: link:../../packages/adapters/adapter-hunter
+      '@sourcerer/adapter-x':
+        specifier: workspace:*
+        version: link:../../packages/adapters/adapter-x
       '@sourcerer/ai':
         specifier: workspace:*
         version: link:../../packages/ai
@@ -74,6 +80,18 @@ importers:
         version: 2.8.0
 
   packages/adapters/adapter-github:
+    dependencies:
+      '@sourcerer/core':
+        specifier: workspace:*
+        version: link:../../core
+
+  packages/adapters/adapter-hunter:
+    dependencies:
+      '@sourcerer/core':
+        specifier: workspace:*
+        version: link:../../core
+
+  packages/adapters/adapter-x:
     dependencies:
       '@sourcerer/core':
         specifier: workspace:*

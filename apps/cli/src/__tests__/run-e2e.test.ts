@@ -18,10 +18,15 @@ import {
   type RawCandidate,
   type Candidate,
   type PipelineContext,
+  type DataSource,
+  type BatchResult,
+  type EnrichmentResult,
+  type CostEstimate,
+  type RateLimitConfig,
 } from '@sourcerer/core';
 import { JsonOutputAdapter } from '@sourcerer/output-json';
 import { MarkdownOutputAdapter } from '@sourcerer/output-markdown';
-import { createStubScoreHandler, createOutputHandler } from '../handlers.js';
+import { createStubScoreHandler, createOutputHandler, createEnrichHandler } from '../handlers.js';
 
 // --- Test Fixtures ---
 
@@ -412,5 +417,257 @@ describe('End-to-End Pipeline', () => {
     const content = await readFile(jsonPath, 'utf-8');
     const parsed = JSON.parse(content);
     expect(parsed.candidateCount).toBe(1);
+  });
+});
+
+// --- Enrichment Orchestrator Tests ---
+
+function makeMockAdapter(
+  name: string,
+  options?: { shouldFail?: boolean; costPerCandidate?: number; evidenceCount?: number },
+): DataSource {
+  const { shouldFail = false, costPerCandidate = 0, evidenceCount = 1 } = options ?? {};
+  const now = '2026-03-25T00:00:00Z';
+
+  return {
+    name,
+    capabilities: ['enrichment'],
+    rateLimits: { requestsPerSecond: 10 },
+    async *search() {
+      throw new Error(`${name} is enrichment-only`);
+    },
+    async enrich(candidate: Candidate): Promise<EnrichmentResult> {
+      if (shouldFail) throw new Error(`${name} failed`);
+      const evidence = Array.from({ length: evidenceCount }, (_, i) => ({
+        id: generateEvidenceId({ adapter: name, source: `https://${name}.test`, claim: `claim-${i}`, retrievedAt: now }),
+        claim: `${name} claim ${i} for ${candidate.name}`,
+        source: `https://${name}.test`,
+        adapter: name,
+        retrievedAt: now,
+        confidence: 'medium' as const,
+      }));
+      return {
+        adapter: name,
+        candidateId: candidate.id,
+        evidence,
+        piiFields: name === 'hunter' ? [{ value: `${candidate.name.toLowerCase().replace(' ', '.')}@test.com`, type: 'email' as const, adapter: 'hunter', collectedAt: now }] : [],
+        sourceData: { adapter: name, retrievedAt: now, urls: [`https://${name}.test`] },
+        enrichedAt: now,
+      };
+    },
+    async enrichBatch(candidates: Candidate[]): Promise<BatchResult<EnrichmentResult>> {
+      const succeeded: { candidateId: string; result: EnrichmentResult }[] = [];
+      const failed: { candidateId: string; error: Error; retryable: boolean }[] = [];
+      for (const c of candidates) {
+        try {
+          const result = await this.enrich(c);
+          succeeded.push({ candidateId: c.id, result });
+        } catch (err) {
+          failed.push({ candidateId: c.id, error: err instanceof Error ? err : new Error(String(err)), retryable: false });
+        }
+      }
+      return { succeeded, failed, costIncurred: succeeded.length * costPerCandidate };
+    },
+    async healthCheck() { return !shouldFail; },
+    estimateCost(): CostEstimate {
+      return { estimatedCost: costPerCandidate, breakdown: {}, searchCount: 0, enrichCount: 1, currency: 'USD' };
+    },
+  };
+}
+
+describe('Enrichment Orchestrator', () => {
+  it('runs multiple adapters in parallel and merges results', async () => {
+    const github = makeMockAdapter('github', { evidenceCount: 2 });
+    const x = makeMockAdapter('x', { evidenceCount: 1 });
+
+    const handler = createEnrichHandler(
+      { github, x } as any,
+    );
+
+    const runner = new PipelineRunner({
+      discover: mockDiscoverHandler(testCandidates),
+      dedup: createDedupHandler(),
+      enrich: handler,
+      score: createStubScoreHandler(searchConfig),
+      output: createOutputHandler([new JsonOutputAdapter()]),
+    });
+
+    const meta = await runner.run({
+      roleName: 'Senior Backend Engineer',
+      runsBaseDir: testDir,
+      searchConfig,
+      talentProfile,
+    });
+
+    expect(meta.status).toBe('completed');
+    const jsonPath = join(meta.runDir, 'candidates.json');
+    const content = await readFile(jsonPath, 'utf-8');
+    const parsed = JSON.parse(content);
+
+    for (const c of parsed.candidates) {
+      // Original exa evidence (1) + github (2) + x (1) = 4
+      expect(c.evidence.length).toBeGreaterThanOrEqual(4);
+      expect(c.enrichments).toHaveProperty('github');
+      expect(c.enrichments).toHaveProperty('x');
+    }
+  });
+
+  it('skips expensive adapters when cheap adapters provide enough signal', async () => {
+    const github = makeMockAdapter('github', { evidenceCount: 3 });
+    const hunter = makeMockAdapter('hunter', { costPerCandidate: 0.05 });
+
+    const configWithConditional: SearchConfig = {
+      ...searchConfig,
+      enrichmentPriority: [
+        { adapter: 'github', required: true, runCondition: 'always' },
+        { adapter: 'hunter', required: false, runCondition: 'if_cheap_insufficient' },
+      ],
+    };
+
+    const handler = createEnrichHandler(
+      { github, hunter } as any,
+      { enrichmentPriority: configWithConditional.enrichmentPriority },
+    );
+
+    const runner = new PipelineRunner({
+      discover: mockDiscoverHandler(testCandidates),
+      dedup: createDedupHandler(),
+      enrich: handler,
+      score: createStubScoreHandler(searchConfig),
+      output: createOutputHandler([new JsonOutputAdapter()]),
+    });
+
+    const meta = await runner.run({
+      roleName: 'Senior Backend Engineer',
+      runsBaseDir: testDir,
+      searchConfig: configWithConditional,
+      talentProfile,
+    });
+
+    expect(meta.status).toBe('completed');
+    const jsonPath = join(meta.runDir, 'candidates.json');
+    const content = await readFile(jsonPath, 'utf-8');
+    const parsed = JSON.parse(content);
+
+    for (const c of parsed.candidates) {
+      expect(c.enrichments).toHaveProperty('github');
+      // Hunter should be skipped since github provided 3+ evidence per candidate
+      // (1 original exa + 3 github = 4 >= MIN_CHEAP_EVIDENCE=3)
+      expect(c.enrichments).not.toHaveProperty('hunter');
+    }
+  });
+
+  it('skips already-enriched candidates when within staleness TTL', async () => {
+    const github = makeMockAdapter('github', { evidenceCount: 1 });
+
+    const handler = createEnrichHandler(
+      { github } as any,
+      { staleTtlMs: 60 * 60 * 1000 }, // 1 hour TTL
+    );
+
+    // First run — should enrich
+    const runner1 = new PipelineRunner({
+      discover: mockDiscoverHandler(testCandidates),
+      dedup: createDedupHandler(),
+      enrich: handler,
+      score: createStubScoreHandler(searchConfig),
+      output: createOutputHandler([new JsonOutputAdapter()]),
+    });
+
+    const meta1 = await runner1.run({
+      roleName: 'Senior Backend Engineer',
+      runsBaseDir: testDir,
+      searchConfig,
+      talentProfile,
+    });
+
+    // Read candidates from first run
+    const json1 = JSON.parse(await readFile(join(meta1.runDir, 'candidates.json'), 'utf-8'));
+    for (const c of json1.candidates) {
+      // Each candidate should have github enrichment
+      expect(c.enrichments).toHaveProperty('github');
+      // 1 original + 1 github = 2
+      expect(c.evidence.length).toBe(2);
+    }
+  });
+
+  it('handles partial adapter failure gracefully', async () => {
+    const github = makeMockAdapter('github', { evidenceCount: 2 });
+    const x = makeMockAdapter('x', { shouldFail: true });
+
+    const handler = createEnrichHandler(
+      { github, x } as any,
+    );
+
+    const runner = new PipelineRunner({
+      discover: mockDiscoverHandler(testCandidates),
+      dedup: createDedupHandler(),
+      enrich: handler,
+      score: createStubScoreHandler(searchConfig),
+      output: createOutputHandler([new JsonOutputAdapter()]),
+    });
+
+    const meta = await runner.run({
+      roleName: 'Senior Backend Engineer',
+      runsBaseDir: testDir,
+      searchConfig,
+      talentProfile,
+    });
+
+    // Pipeline still completes — partial enrichment is OK
+    expect(meta.status).toBe('completed');
+    const jsonPath = join(meta.runDir, 'candidates.json');
+    const content = await readFile(jsonPath, 'utf-8');
+    const parsed = JSON.parse(content);
+
+    for (const c of parsed.candidates) {
+      // GitHub succeeded, X failed — candidates still have github enrichment
+      expect(c.enrichments).toHaveProperty('github');
+    }
+  });
+
+  it('runs expensive adapters when cheap signal is insufficient', async () => {
+    // GitHub provides only 1 evidence item (insufficient — need 3)
+    const github = makeMockAdapter('github', { evidenceCount: 1 });
+    const hunter = makeMockAdapter('hunter', { costPerCandidate: 0.05, evidenceCount: 1 });
+
+    const configWithConditional: SearchConfig = {
+      ...searchConfig,
+      enrichmentPriority: [
+        { adapter: 'github', required: true, runCondition: 'always' },
+        { adapter: 'hunter', required: false, runCondition: 'if_cheap_insufficient' },
+      ],
+    };
+
+    const handler = createEnrichHandler(
+      { github, hunter } as any,
+      { enrichmentPriority: configWithConditional.enrichmentPriority },
+    );
+
+    const runner = new PipelineRunner({
+      discover: mockDiscoverHandler(testCandidates),
+      dedup: createDedupHandler(),
+      enrich: handler,
+      score: createStubScoreHandler(searchConfig),
+      output: createOutputHandler([new JsonOutputAdapter()]),
+    });
+
+    const meta = await runner.run({
+      roleName: 'Senior Backend Engineer',
+      runsBaseDir: testDir,
+      searchConfig: configWithConditional,
+      talentProfile,
+    });
+
+    expect(meta.status).toBe('completed');
+    const jsonPath = join(meta.runDir, 'candidates.json');
+    const content = await readFile(jsonPath, 'utf-8');
+    const parsed = JSON.parse(content);
+
+    for (const c of parsed.candidates) {
+      // Not enough cheap evidence, so hunter should have run
+      expect(c.enrichments).toHaveProperty('github');
+      expect(c.enrichments).toHaveProperty('hunter');
+    }
   });
 });

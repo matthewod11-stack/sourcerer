@@ -16,7 +16,16 @@ import {
   extractEmailsFromCommits,
   computeLanguageDistribution,
   buildProfileEvidence,
+  buildContributionTrends,
 } from './parsers.js';
+
+/** Options for enrichBatch() */
+export interface EnrichBatchOptions {
+  /** How long (ms) before a cached enrichment is considered stale. Default: 24h */
+  staleTtlMs?: number;
+}
+
+const DEFAULT_STALE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export class GitHubAdapter implements DataSource {
   readonly name = 'github';
@@ -72,6 +81,14 @@ export class GitHubAdapter implements DataSource {
         }
       }
 
+      // Fetch events for contribution trends (best-effort)
+      let events: Awaited<ReturnType<GitHubClient['fetchUserEvents']>> = [];
+      try {
+        events = await this.client.fetchUserEvents(username);
+      } catch {
+        // Events endpoint may fail for various reasons; continue without
+      }
+
       const emails = extractEmailsFromCommits(allCommits);
       const languages = computeLanguageDistribution(repos);
       const { evidence, piiFields, sourceData } = buildProfileEvidence(
@@ -82,6 +99,10 @@ export class GitHubAdapter implements DataSource {
         allCommits.length,
       );
 
+      // Add contribution trend evidence
+      const trendEvidence = buildContributionTrends(repos, events, user.html_url);
+      evidence.push(...trendEvidence);
+
       return {
         adapter: 'github',
         candidateId: candidate.id,
@@ -91,31 +112,122 @@ export class GitHubAdapter implements DataSource {
         enrichedAt: now,
       };
     } catch (err) {
-      if (err instanceof GitHubApiError && err.status === 404) {
+      if (err instanceof GitHubApiError && err.isNotFound) {
         return this.emptyResult(candidate.id, now);
       }
       throw err;
     }
   }
 
-  async enrichBatch(candidates: Candidate[]): Promise<BatchResult<EnrichmentResult>> {
+  async enrichBatch(
+    candidates: Candidate[],
+    options?: EnrichBatchOptions,
+  ): Promise<BatchResult<EnrichmentResult>> {
+    const staleTtlMs = options?.staleTtlMs ?? DEFAULT_STALE_TTL_MS;
+    const maxConcurrent = this.client.authenticated ? 5 : 2;
+
     const succeeded: { candidateId: string; result: EnrichmentResult }[] = [];
     const failed: { candidateId: string; error: Error; retryable: boolean }[] = [];
 
+    // Separate candidates into cached (skip) vs needs-enrichment
+    const toEnrich: Candidate[] = [];
+    const now = Date.now();
+
     for (const candidate of candidates) {
-      await this.delay();
-      try {
-        const result = await this.enrich(candidate);
-        succeeded.push({ candidateId: candidate.id, result });
-      } catch (err) {
-        const isRateLimit = err instanceof GitHubApiError && (err.status === 429 || err.status === 403);
+      const existing = candidate.enrichments['github'];
+      if (existing && existing.enrichedAt) {
+        const enrichedAtMs = new Date(existing.enrichedAt).getTime();
+        if (now - enrichedAtMs < staleTtlMs) {
+          // Still fresh — use cached result
+          succeeded.push({ candidateId: candidate.id, result: existing });
+          continue;
+        }
+      }
+      toEnrich.push(candidate);
+    }
+
+    // Inline semaphore for concurrency control
+    let active = 0;
+    let rateLimited = false;
+    const queue: Array<() => void> = [];
+
+    const acquireSemaphore = (): Promise<void> => {
+      if (active < maxConcurrent) {
+        active++;
+        return Promise.resolve();
+      }
+      return new Promise<void>((resolve) => {
+        queue.push(() => {
+          active++;
+          resolve();
+        });
+      });
+    };
+
+    const releaseSemaphore = (): void => {
+      active--;
+      const next = queue.shift();
+      if (next) next();
+    };
+
+    // Process candidates with semaphore-controlled concurrency
+    const unprocessedTracker = { remaining: new Set(toEnrich.map((c) => c.id)) };
+
+    const processOne = async (candidate: Candidate): Promise<void> => {
+      // If rate-limited, immediately mark as retryable failure
+      if (rateLimited) {
         failed.push({
           candidateId: candidate.id,
-          error: err instanceof Error ? err : new Error(String(err)),
-          retryable: isRateLimit,
+          error: new Error('Rate limit exhausted — skipped'),
+          retryable: true,
         });
+        return;
       }
-    }
+
+      await acquireSemaphore();
+
+      // Re-check after acquiring — rate limit may have been hit while waiting
+      if (rateLimited) {
+        releaseSemaphore();
+        failed.push({
+          candidateId: candidate.id,
+          error: new Error('Rate limit exhausted — skipped'),
+          retryable: true,
+        });
+        return;
+      }
+
+      try {
+        await this.delay();
+        const result = await this.enrich(candidate);
+        unprocessedTracker.remaining.delete(candidate.id);
+        succeeded.push({ candidateId: candidate.id, result });
+      } catch (err) {
+        unprocessedTracker.remaining.delete(candidate.id);
+        const isRateLimit = err instanceof GitHubApiError && err.isRateLimit;
+
+        if (isRateLimit) {
+          // Set flag — all subsequent candidates will be marked retryable
+          rateLimited = true;
+          failed.push({
+            candidateId: candidate.id,
+            error: err instanceof Error ? err : new Error(String(err)),
+            retryable: true,
+          });
+        } else {
+          failed.push({
+            candidateId: candidate.id,
+            error: err instanceof Error ? err : new Error(String(err)),
+            retryable: false,
+          });
+        }
+      } finally {
+        releaseSemaphore();
+      }
+    };
+
+    // Launch all with semaphore gating
+    await Promise.all(toEnrich.map((candidate) => processOne(candidate)));
 
     return { succeeded, failed, costIncurred: 0 };
   }
