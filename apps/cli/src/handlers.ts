@@ -19,11 +19,19 @@ import type {
   EnrichmentPriority,
   BatchResult,
   EnrichmentResult,
+  AIProvider,
+  TalentProfile,
 } from '@sourcerer/core';
 import type { ExaAdapter } from '@sourcerer/adapter-exa';
 import type { GitHubAdapter } from '@sourcerer/adapter-github';
 import type { XAdapter } from '@sourcerer/adapter-x';
 import type { HunterAdapter } from '@sourcerer/adapter-hunter';
+import {
+  extractSignals,
+  calculateScore,
+  assignTier,
+  generateNarrative,
+} from '@sourcerer/scoring';
 
 export function createDiscoverHandler(
   exa: ExaAdapter,
@@ -293,6 +301,53 @@ export function createEnrichHandler(
   };
 }
 
+export function createScoreHandler(
+  searchConfig: SearchConfig,
+  talentProfile: TalentProfile,
+  provider: AIProvider,
+): PhaseHandler<EnrichPhaseOutput, ScorePhaseOutput> {
+  return {
+    async execute(input) {
+      const scoredCandidates: ScoredCandidate[] = [];
+      let costIncurred = 0;
+
+      for (const candidate of input.candidates) {
+        // 5.1: Extract signals via LLM
+        const { signals } = await extractSignals(candidate, talentProfile, provider);
+
+        // 5.2: Calculate weighted score
+        const score = calculateScore(signals, searchConfig.scoringWeights);
+
+        // 5.4: Assign tier
+        const tier = assignTier(score.total, searchConfig.tierThresholds);
+
+        // 5.3: Generate narrative via LLM
+        const narrative = await generateNarrative(
+          candidate,
+          talentProfile,
+          signals,
+          score,
+          provider,
+        );
+
+        scoredCandidates.push({
+          ...candidate,
+          signals,
+          score,
+          narrative,
+          tier,
+        });
+      }
+
+      return {
+        status: 'completed',
+        data: { candidates: scoredCandidates, costIncurred },
+      };
+    },
+  };
+}
+
+/** Stub scorer for testing — assigns flat scores without LLM calls */
 export function createStubScoreHandler(
   searchConfig: SearchConfig,
 ): PhaseHandler<EnrichPhaseOutput, ScorePhaseOutput> {
@@ -310,13 +365,7 @@ export function createStubScoreHandler(
       const candidates: ScoredCandidate[] = input.candidates.map(
         (c: Candidate) => {
           const total = Math.min(100, 20 + c.evidence.length * 5);
-          const tier: 1 | 2 | 3 =
-            total >= searchConfig.tierThresholds.tier1MinScore
-              ? 1
-              : total >= searchConfig.tierThresholds.tier2MinScore
-                ? 2
-                : 3;
-
+          const tier = assignTier(total, searchConfig.tierThresholds);
           const sources = Object.keys(c.sources).join(', ') || 'unknown';
           return {
             ...c,

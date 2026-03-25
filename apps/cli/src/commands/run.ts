@@ -18,11 +18,12 @@ import { XAdapter } from '@sourcerer/adapter-x';
 import { HunterAdapter } from '@sourcerer/adapter-hunter';
 import { JsonOutputAdapter } from '@sourcerer/output-json';
 import { MarkdownOutputAdapter } from '@sourcerer/output-markdown';
+import { createAIProvider } from '@sourcerer/ai';
 import { loadConfigFromDisk, configFileExists } from '../config-io.js';
 import {
   createDiscoverHandler,
   createEnrichHandler,
-  createStubScoreHandler,
+  createScoreHandler,
   createOutputHandler,
 } from '../handlers.js';
 
@@ -186,6 +187,9 @@ export async function runCommand(args: string[]): Promise<void> {
     outputAdapters.push(new JsonOutputAdapter());
   }
 
+  // Create AI provider for scoring
+  const aiProvider = createAIProvider(sourcererConfig, { noCache: parsed.noCache });
+
   // Build pipeline
   const runner = new PipelineRunner({
     discover: createDiscoverHandler(exa),
@@ -194,7 +198,7 @@ export async function runCommand(args: string[]): Promise<void> {
       enrichmentPriority: searchConfig?.enrichmentPriority,
       maxCostUsd: searchConfig?.maxCostUsd,
     }),
-    score: createStubScoreHandler(searchConfig!),
+    score: createScoreHandler(searchConfig!, talentProfile!, aiProvider),
     output: createOutputHandler(outputAdapters),
   });
 

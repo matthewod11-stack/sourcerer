@@ -137,9 +137,15 @@ importers:
 
   packages/scoring:
     dependencies:
+      '@sourcerer/ai':
+        specifier: workspace:*
+        version: link:../ai
       '@sourcerer/core':
         specifier: workspace:*
         version: link:../core
+      zod:
+        specifier: ^3.24.3
+        version: 3.25.76
 
 packages:
 
