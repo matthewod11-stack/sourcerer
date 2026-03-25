@@ -106,6 +106,7 @@ export class HunterAdapter implements DataSource {
   async enrichBatch(candidates: Candidate[]): Promise<BatchResult<EnrichmentResult>> {
     const succeeded: { candidateId: string; result: EnrichmentResult }[] = [];
     const failed: { candidateId: string; error: Error; retryable: boolean }[] = [];
+    let apiCallCount = 0;
 
     // Pre-fetch account info to know quota if not already loaded
     if (this.client.getRemainingQuota() === null) {
@@ -141,8 +142,15 @@ export class HunterAdapter implements DataSource {
       await this.delay();
 
       try {
+        // Check if this candidate will actually hit the API
+        // (enrich returns early with empty result for missing name/domain)
+        const { firstName, lastName } = this.extractName(candidate);
+        const domain = this.extractDomain(candidate);
+        const willCallApi = !!(firstName && lastName && domain);
+
         const result = await this.enrich(candidate);
         succeeded.push({ candidateId: candidate.id, result });
+        if (willCallApi) apiCallCount++;
       } catch (err) {
         const isRateLimit =
           err instanceof HunterApiError && (err.status === 429 || err.status === 401);
@@ -151,10 +159,12 @@ export class HunterAdapter implements DataSource {
           error: err instanceof Error ? err : new Error(String(err)),
           retryable: isRateLimit,
         });
+        apiCallCount++; // Failed API calls still cost
       }
     }
 
-    return { succeeded, failed, costIncurred: succeeded.length * this.costPerSearch };
+    // Only charge for candidates that actually hit the Hunter API
+    return { succeeded, failed, costIncurred: apiCallCount * this.costPerSearch };
   }
 
   async healthCheck(): Promise<boolean> {

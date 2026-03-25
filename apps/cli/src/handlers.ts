@@ -108,15 +108,18 @@ export function createEnrichHandler(
       const cheapAdapters = activeAdapters.filter((a) => !EXPENSIVE_ADAPTERS.has(a.name));
       const expensiveAdapters = activeAdapters.filter((a) => EXPENSIVE_ADAPTERS.has(a.name));
 
-      // Budget gate: estimate total cost and log warning
+      // Budget gate: estimate total cost per adapter and skip those that would exceed budget
+      let budgetRemaining = options?.maxCostUsd ?? Infinity;
+      const budgetedAdapters = new Set<string>();
       if (options?.maxCostUsd !== undefined) {
-        let estimatedTotal = 0;
-        const dummyConfig = { roleName: '', tiers: [], scoringWeights: {}, tierThresholds: { tier1MinScore: 70, tier2MinScore: 40 }, enrichmentPriority: [], antiFilters: [], createdAt: '', version: 1 } satisfies SearchConfig;
-        for (const { adapter } of activeAdapters) {
-          estimatedTotal += adapter.estimateCost(dummyConfig).estimatedCost * candidates.length;
-        }
-        if (estimatedTotal > options.maxCostUsd) {
-          console.warn(`[enrich] Estimated enrichment cost $${estimatedTotal.toFixed(4)} exceeds budget $${options.maxCostUsd.toFixed(4)}`);
+        for (const { name, adapter } of activeAdapters) {
+          const estimate = adapter.estimateCost({ ...({} as SearchConfig), maxCandidates: candidates.length } as SearchConfig);
+          if (estimate.estimatedCost <= budgetRemaining) {
+            budgetRemaining -= estimate.estimatedCost;
+            budgetedAdapters.add(name);
+          } else {
+            console.warn(`[enrich] Skipping ${name}: estimated cost $${estimate.estimatedCost.toFixed(4)} exceeds remaining budget $${budgetRemaining.toFixed(4)}`);
+          }
         }
       }
 
@@ -138,12 +141,25 @@ export function createEnrichHandler(
           const candidate = candidates.find((c) => c.id === candidateId);
           if (!candidate) continue;
 
-          candidate.enrichments[result.adapter] = result;
+          const adapterName = result.adapter;
+          const isReEnrich = !!candidate.enrichments[adapterName];
+
+          if (isReEnrich) {
+            // Remove old evidence/PII from this adapter before adding new
+            const oldEvIds = new Set(candidate.enrichments[adapterName].evidence.map((e) => e.id));
+            candidate.evidence = candidate.evidence.filter((e) => !oldEvIds.has(e.id));
+            const oldPiiValues = new Set(
+              candidate.enrichments[adapterName].piiFields.map((p) => `${p.adapter}:${p.value}`),
+            );
+            candidate.pii.fields = candidate.pii.fields.filter(
+              (p) => !oldPiiValues.has(`${p.adapter}:${p.value}`),
+            );
+          }
+
+          candidate.enrichments[adapterName] = result;
           candidate.evidence.push(...result.evidence);
           candidate.pii.fields.push(...result.piiFields);
-          if (!candidate.sources[result.adapter]) {
-            candidate.sources[result.adapter] = result.sourceData;
-          }
+          candidate.sources[adapterName] = result.sourceData;
         }
 
         for (const failure of batch.failed) {
@@ -155,10 +171,14 @@ export function createEnrichHandler(
         }
       };
 
-      // Run cheap adapters in parallel
-      if (cheapAdapters.length > 0) {
+      // Run cheap adapters in parallel (respecting budget gate)
+      const budgetFilteredCheap = options?.maxCostUsd !== undefined
+        ? cheapAdapters.filter((a) => budgetedAdapters.has(a.name))
+        : cheapAdapters;
+
+      if (budgetFilteredCheap.length > 0) {
         const cheapResults = await Promise.allSettled(
-          cheapAdapters.map(({ name, adapter }) => {
+          budgetFilteredCheap.map(({ name, adapter }) => {
             const toEnrich = candidatesNeedingEnrichment(name);
             if (toEnrich.length === 0) return Promise.resolve(null);
             return adapter.enrichBatch(toEnrich);
@@ -178,8 +198,11 @@ export function createEnrichHandler(
         }
       }
 
-      // Run expensive adapters conditionally
+      // Run expensive adapters conditionally (respecting budget gate)
       for (const { name, adapter, priority } of expensiveAdapters) {
+        // Budget gate: skip if this adapter was excluded by budget
+        if (options?.maxCostUsd !== undefined && !budgetedAdapters.has(name)) continue;
+
         // Check conditional execution
         if (priority?.runCondition === 'if_cheap_insufficient') {
           const allHaveEnoughEvidence = candidates.every(
@@ -203,29 +226,56 @@ export function createEnrichHandler(
         }
       }
 
-      // Cross-source identity check: log when emails match across adapters
-      for (const c of candidates) {
-        const emailsByAdapter: Record<string, Set<string>> = {};
-        for (const pii of c.pii.fields) {
-          if (pii.type === 'email') {
-            if (!emailsByAdapter[pii.adapter]) emailsByAdapter[pii.adapter] = new Set();
-            emailsByAdapter[pii.adapter].add(pii.value.toLowerCase());
+      // Post-enrichment cross-candidate identity linking:
+      // If two different candidates now share a PII email (discovered during enrichment),
+      // merge the duplicate into the primary and remove it from the list.
+      const emailToCandidate = new Map<string, number>();
+      const indicesToRemove = new Set<number>();
+
+      for (let i = 0; i < candidates.length; i++) {
+        for (const pii of candidates[i].pii.fields) {
+          if (pii.type !== 'email') continue;
+          const email = pii.value.toLowerCase();
+          const existingIdx = emailToCandidate.get(email);
+
+          if (existingIdx !== undefined && existingIdx !== i && !indicesToRemove.has(i)) {
+            // Merge candidate[i] into candidate[existingIdx]
+            const primary = candidates[existingIdx];
+            const duplicate = candidates[i];
+            console.log(`[enrich] Merging duplicate: ${duplicate.name} → ${primary.name} (shared email: ${email})`);
+
+            // Merge evidence (deduplicate by ID)
+            const existingEvIds = new Set(primary.evidence.map((e) => e.id));
+            for (const ev of duplicate.evidence) {
+              if (!existingEvIds.has(ev.id)) primary.evidence.push(ev);
+            }
+
+            // Merge PII (deduplicate by adapter:value)
+            const existingPii = new Set(primary.pii.fields.map((p) => `${p.adapter}:${p.value}`));
+            for (const p of duplicate.pii.fields) {
+              if (!existingPii.has(`${p.adapter}:${p.value}`)) primary.pii.fields.push(p);
+            }
+
+            // Merge enrichments and sources
+            for (const [k, v] of Object.entries(duplicate.enrichments)) {
+              if (!primary.enrichments[k]) primary.enrichments[k] = v;
+            }
+            for (const [k, v] of Object.entries(duplicate.sources)) {
+              if (!primary.sources[k]) primary.sources[k] = v;
+            }
+
+            indicesToRemove.add(i);
+          } else if (existingIdx === undefined) {
+            emailToCandidate.set(email, i);
           }
         }
-        const adapterNames = Object.keys(emailsByAdapter);
-        if (adapterNames.length >= 2) {
-          // Check for cross-adapter email matches
-          for (let i = 0; i < adapterNames.length; i++) {
-            for (let j = i + 1; j < adapterNames.length; j++) {
-              const setA = emailsByAdapter[adapterNames[i]];
-              const setB = emailsByAdapter[adapterNames[j]];
-              for (const email of setA) {
-                if (setB.has(email)) {
-                  console.log(`[enrich] Identity confirmed: ${c.name} — email ${email} found by both ${adapterNames[i]} and ${adapterNames[j]}`);
-                }
-              }
-            }
-          }
+      }
+
+      // Remove merged duplicates (iterate in reverse to preserve indices)
+      if (indicesToRemove.size > 0) {
+        const sorted = [...indicesToRemove].sort((a, b) => b - a);
+        for (const idx of sorted) {
+          candidates.splice(idx, 1);
         }
       }
 

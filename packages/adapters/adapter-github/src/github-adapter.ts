@@ -58,11 +58,12 @@ export class GitHubAdapter implements DataSource {
     }
 
     try {
-      // Fetch profile and repos in parallel
-      const [user, repos] = await Promise.all([
-        this.client.fetchUser(username),
-        this.client.fetchRepos(username, 20),
-      ]);
+      // Fetch profile and repos sequentially to respect rate limits
+      // (parallel would double HTTP requests and burst past declared rate)
+      await this.delay();
+      const user = await this.client.fetchUser(username);
+      await this.delay();
+      const repos = await this.client.fetchRepos(username, 20);
 
       // Fetch commits from top 3 repos by stars (for email extraction)
       const topRepos = repos
@@ -84,6 +85,7 @@ export class GitHubAdapter implements DataSource {
       // Fetch events for contribution trends (best-effort)
       let events: Awaited<ReturnType<GitHubClient['fetchUserEvents']>> = [];
       try {
+        await this.delay();
         events = await this.client.fetchUserEvents(username);
       } catch {
         // Events endpoint may fail for various reasons; continue without
@@ -198,7 +200,6 @@ export class GitHubAdapter implements DataSource {
       }
 
       try {
-        await this.delay();
         const result = await this.enrich(candidate);
         unprocessedTracker.remaining.delete(candidate.id);
         succeeded.push({ candidateId: candidate.id, result });
