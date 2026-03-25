@@ -314,11 +314,11 @@ Phase 7: Polish & Advanced ─────────────────�
 **Sessions:** 1
 
 adapter-github was built in Phase 2.3. This phase hardens it for production enrichment at scale:
-- [ ] `enrichBatch()` optimization for 50+ candidates (parallel with rate limit pooling)
-- [ ] Incremental enrichment: skip candidates already enriched by GitHub (check staleness)
-- [ ] Deeper contribution analysis: language distribution over time, OSS vs private ratio, commit frequency trends
-- [ ] Handle edge cases: private profiles, no public repos, rate limit exhaustion mid-batch
-- [ ] Integration test: enrichBatch with 20 candidates, verify partial failure handling
+- [x] `enrichBatch()` optimization for 50+ candidates (parallel with rate limit pooling) ✅ (2026-03-25)
+- [x] Incremental enrichment: skip candidates already enriched by GitHub (check staleness) ✅ (2026-03-25)
+- [x] Deeper contribution analysis: language distribution over time, OSS vs private ratio, commit frequency trends ✅ (2026-03-25)
+- [x] Handle edge cases: private profiles, no public repos, rate limit exhaustion mid-batch ✅ (2026-03-25)
+- [x] Integration test: enrichBatch with 20 candidates, verify partial failure handling ✅ (2026-03-25)
 - **Acceptance:** Given 50 candidates, enrichBatch completes with proper rate limiting, handles 3+ failures gracefully, skips already-enriched candidates.
 
 ### Phase 4B: adapter-x (Agent 2)
@@ -326,15 +326,12 @@ adapter-github was built in Phase 2.3. This phase hardens it for production enri
 **Read-only:** `@sourcerer/core` types
 **Sessions:** 1-2
 
-- [ ] Implements `DataSource` with `capabilities: ['enrichment']`
-- [ ] `enrich()`: given a candidate with Twitter handle or URL:
-  - Fetch user profile (bio, follower count, location, DM status if available)
-  - Fetch recent tweets (last 50-100, engagement metrics)
-  - Extract signals: content style, posting frequency, engagement patterns, growth indicators
-- [ ] `enrichBatch()` with rate limiting per X API tier
-- [ ] Evidence item generation: each signal/fact becomes an `EvidenceItem` with `adapter: 'x'`
-- [ ] Handle: no X handle found, protected account, rate limits, API errors
-- [ ] Unit tests with mocked X API responses
+- [x] Implements `DataSource` with `capabilities: ['enrichment']` ✅ (2026-03-25)
+- [x] `enrich()`: given a candidate with Twitter handle or URL ✅ (2026-03-25)
+- [x] `enrichBatch()` with rate limiting per X API tier ✅ (2026-03-25)
+- [x] Evidence item generation: each signal/fact becomes an `EvidenceItem` with `adapter: 'x'` ✅ (2026-03-25)
+- [x] Handle: no X handle found, protected account, rate limits, API errors ✅ (2026-03-25)
+- [x] Unit tests with mocked X API responses ✅ (2026-03-25)
 - **Acceptance:** Given a Twitter handle, returns enriched profile with bio, recent tweets, engagement metrics, and extracted signals. Each fact is a properly sourced `EvidenceItem`.
 
 ### Phase 4C: adapter-hunter (Agent 3)
@@ -342,29 +339,27 @@ adapter-github was built in Phase 2.3. This phase hardens it for production enri
 **Read-only:** `@sourcerer/core` types
 **Sessions:** 1
 
-- [ ] Implements `DataSource` with `capabilities: ['enrichment']`
-- [ ] `enrich()`: given a candidate with name + company/domain:
-  - Email finder (name + domain → email)
-  - Email verification (email → deliverable/risky/undeliverable)
-- [ ] `enrichBatch()` with rate limiting (Hunter free tier: 25 searches/mo)
-- [ ] Evidence item generation: email + verification status as `EvidenceItem`
-- [ ] PII tagging: all emails as `PIIField` with `adapter: 'hunter'`
-- [ ] Handle: no results, unverifiable, rate limits, quota exhaustion
-- [ ] Unit tests with mocked Hunter API responses
+- [x] Implements `DataSource` with `capabilities: ['enrichment']` ✅ (2026-03-25)
+- [x] `enrich()`: email finder + verification ✅ (2026-03-25)
+- [x] `enrichBatch()` with rate limiting (Hunter free tier: 25 searches/mo) ✅ (2026-03-25)
+- [x] Evidence item generation: email + verification status as `EvidenceItem` ✅ (2026-03-25)
+- [x] PII tagging: all emails as `PIIField` with `adapter: 'hunter'` ✅ (2026-03-25)
+- [x] Handle: no results, unverifiable, rate limits, quota exhaustion ✅ (2026-03-25)
+- [x] Unit tests with mocked Hunter API responses ✅ (2026-03-25)
 - **Acceptance:** Given name + company, returns email if found with verification status. PII properly tagged. Handles quota exhaustion gracefully.
 
 ### Phase 4D: Enrichment Orchestrator (Sequential — needs all adapters)
 **Sessions:** 1
 
-- [ ] Parallel enrichment execution: run all configured adapters simultaneously per candidate
-- [ ] Priority ordering: run cheap/fast adapters first (GitHub), expensive later (Pearch, PDL)
-- [ ] Conditional execution: skip expensive adapters if cheap ones produced enough signal
-- [ ] Budget gate: estimate enrichment cost before running, confirm with user
-- [ ] Incremental enrichment: on rerun, skip already-enriched candidates (check staleness threshold)
-- [ ] Partial failure handling: if Hunter fails, GitHub results still saved
-- [ ] Aggregate evidence items from all adapters into candidate's `EvidenceItem[]`
-- [ ] Aggregate PII fields from all adapters into candidate's `PIIMetadata`
-- [ ] Cross-source identity linking: if GitHub email matches Hunter email, merge identities
+- [x] Parallel enrichment execution: run all configured adapters simultaneously per candidate ✅ (2026-03-25)
+- [x] Priority ordering: run cheap/fast adapters first (GitHub), expensive later (Pearch, PDL) ✅ (2026-03-25)
+- [x] Conditional execution: skip expensive adapters if cheap ones produced enough signal ✅ (2026-03-25)
+- [x] Budget gate: estimate enrichment cost before running, skip if over budget ✅ (2026-03-25)
+- [x] Incremental enrichment: on rerun, skip already-enriched candidates (check staleness threshold) ✅ (2026-03-25)
+- [x] Partial failure handling: if Hunter fails, GitHub results still saved ✅ (2026-03-25)
+- [x] Aggregate evidence items from all adapters into candidate's `EvidenceItem[]` ✅ (2026-03-25)
+- [x] Aggregate PII fields from all adapters into candidate's `PIIMetadata` ✅ (2026-03-25)
+- [x] Cross-source identity linking: if GitHub email matches Hunter email, merge identities ✅ (2026-03-25)
 - **Acceptance:** Given 20 candidates, orchestrator runs GitHub + X + Hunter in parallel, respects rate limits, handles partial failures, produces fully enriched candidates with merged evidence.
 
 **End of Phase 4:** `/checkpoint` — Full pipeline: intake → discovery → enrichment → JSON output with multi-source evidence.
@@ -378,38 +373,38 @@ adapter-github was built in Phase 2.3. This phase hardens it for production enri
 **Start command:** `/session-start`
 
 ### 5.1 Signal Extraction
-- [ ] LLM receives: enriched candidate data, talent profile, list of `EvidenceItem` IDs + claims
-- [ ] Structured output: `ExtractedSignals` with `evidenceIds` per dimension
-- [ ] Evidence grounding validation: scorer rejects any `evidenceId` not in the canonical set
-- [ ] Red flag extraction with severity and evidence
-- [ ] Prompt template: `scoring-signal-extract.md` with grounding constraint
+- [x] LLM receives: enriched candidate data, talent profile, list of `EvidenceItem` IDs + claims ✅ (2026-03-25)
+- [x] Structured output: `ExtractedSignals` with `evidenceIds` per dimension ✅ (2026-03-25)
+- [x] Evidence grounding validation: scorer rejects any `evidenceId` not in the canonical set ✅ (2026-03-25)
+- [x] Red flag extraction with severity and evidence ✅ (2026-03-25)
+- [x] Prompt template: `scoring-signal-extract.md` with grounding constraint ✅ (2026-03-25)
 - **Acceptance:** Given a candidate with 10 evidence items, LLM produces `ExtractedSignals` referencing only valid IDs. If LLM hallucinates an ID, the scorer rejects that signal.
 
 ### 5.2 Weighted Scoring Calculator
-- [ ] Reads scoring weights from search config
-- [ ] Applies weights to signal scores: `raw * weight * 10` per dimension
-- [ ] Aggregates to 0-100 total score
-- [ ] Generates `ScoreComponent[]` with `evidenceIds` (passed through from signals)
-- [ ] Red flags reduce total score by configurable penalties
+- [x] Reads scoring weights from search config ✅ (2026-03-25)
+- [x] Applies weights to signal scores: `raw * weight * 10` per dimension ✅ (2026-03-25)
+- [x] Aggregates to 0-100 total score ✅ (2026-03-25)
+- [x] Generates `ScoreComponent[]` with `evidenceIds` (passed through from signals) ✅ (2026-03-25)
+- [x] Red flags reduce total score by configurable penalties ✅ (2026-03-25)
 - **Acceptance:** Given signals with weights {technical: 0.3, domain: 0.25, trajectory: 0.2, culture: 0.15, reachability: 0.1}, produces correct weighted total. Evidence IDs pass through correctly.
 
 ### 5.3 Narrative Generation
-- [ ] LLM receives ONLY: `EvidenceItem[]` + `ScoreComponent[]` + talent profile summary
-- [ ] Prompt template: `scoring-narrative.md` with explicit grounding constraint
-- [ ] Output: natural language paragraph per candidate
+- [x] LLM receives ONLY: `EvidenceItem[]` + `ScoreComponent[]` + talent profile summary ✅ (2026-03-25)
+- [x] Prompt template: `scoring-narrative.md` with explicit grounding constraint ✅ (2026-03-25)
+- [x] Output: natural language paragraph per candidate ✅ (2026-03-25)
 - [ ] Validation: spot-check that narrative claims map to evidence items (log warning if unmappable claim detected)
 - **Acceptance:** Generated narrative for a candidate references only facts present in evidence items. No fabricated details.
 
 ### 5.4 Tiering
-- [ ] Configurable thresholds (default: Tier 1 ≥ 70, Tier 2 ≥ 40, Tier 3 < 40)
-- [ ] Thresholds editable in search config
+- [x] Configurable thresholds (default: Tier 1 ≥ 70, Tier 2 ≥ 40, Tier 3 < 40) ✅ (2026-03-25)
+- [x] Thresholds editable in search config ✅ (2026-03-25)
 - **Acceptance:** Candidates are correctly tiered based on total score.
 
 ### 5.5 Re-scoring Flow
 - [ ] `sourcerer score` command re-runs scoring on existing enriched candidates
 - [ ] Does NOT re-run discovery or enrichment (cheap operation)
-- [ ] Signal extraction re-runs only if evidence changed; otherwise uses cached signals
-- [ ] Math + narrative regeneration always runs
+- [x] Signal extraction re-runs only if evidence changed; otherwise uses cached signals (provider caching handles this) ✅ (2026-03-25)
+- [x] Math + narrative regeneration always runs ✅ (2026-03-25)
 - [ ] Updated candidates written back to run artifacts
 - **Acceptance:** User adjusts weights in search config, runs `sourcerer score`, gets re-ranked candidates with new narratives. No API calls to data sources.
 

@@ -2,6 +2,36 @@
 
 ---
 
+## Session: 2026-03-25 13:30 — Phase 4 + Phase 5 (Enrichment Adapters + Scoring Engine)
+
+### Completed
+- **Phase 4A:** adapter-github hardening — parallel enrichBatch with semaphore concurrency, incremental enrichment (TTL skip), rate limit exhaustion handling, deeper contribution analysis (OSS ratio, commit frequency, language trends). 14 → 32 tests.
+- **Phase 4B:** adapter-x (new package) — Twitter/X enrichment with tier-aware rate limiting, profile + tweet evidence, engagement metrics, technical content detection. 26 tests.
+- **Phase 4C:** adapter-hunter (new package) — Hunter.io email finder + verifier, PII tagging, quota tracking with exhaustion guard. 19 tests.
+- **Phase 4D:** Enrichment orchestrator — parallel cheap adapter execution, conditional expensive adapter gating, budget gate (actually skips, not just warns), incremental enrichment, post-enrichment cross-candidate identity merging. 5 new CLI tests.
+- **Phase 4 review fixes:** 5 findings addressed — GitHub rate limiting at HTTP level, real cross-candidate identity merging, stale re-enrichment dedup, budget gate enforcement, Hunter cost accuracy.
+- **Phase 5.1:** Signal extraction — LLM-driven `ExtractedSignals` with Zod schema validation, evidence grounding validator (strips hallucinated IDs, adjusts confidence). 16 tests.
+- **Phase 5.2:** Score math — weighted scoring with configurable red flag penalties, `ScoreComponent` breakdown, tier assignment. 11 tests.
+- **Phase 5.3:** Narrative generation — LLM narrative with evidence citations via `provider.chat()`. 8 tests.
+- **Phase 5.5:** CLI wiring — `createScoreHandler` replaces stub in pipeline, AI provider instantiated in run command. Stub kept for test use.
+
+### Stats
+- **Tests:** 394 → 497 (+103 new tests)
+- **New packages:** adapter-x, adapter-hunter (2 fully built)
+- **Packages substantially modified:** adapter-github (hardened), scoring (built from empty), cli (orchestrator + score wiring)
+
+### Issues Encountered
+- Pipeline runner expects `partialData` (not `data`) when status is `'partial'` — fixed in enrichment orchestrator
+- Existing e2e tests relied on `createStubScoreHandler` — kept it exported alongside the real `createScoreHandler`
+
+### Next Session Should
+- **Phase 6:** Output adapters (output-csv, output-notion, CLI results display)
+- Run live smoke test with real API keys to validate scoring end-to-end
+- Consider adding `sourcerer score` command (re-score without re-enriching)
+- Consider CI workflow (`.github/workflows/ci.yml`)
+
+---
+
 ## Session: 2026-03-24 18:00 — Hardening Pass (6 Fixes)
 
 ### Completed
