@@ -31,8 +31,10 @@ export interface ScoreOptions {
 /**
  * Calculate a weighted score from extracted signals.
  *
- * For each dimension: weighted = raw * weight * 10
- * (scale factor of 10 maps weights summing to ~1 into the 0-100 total range)
+ * For each dimension: weighted = raw * weight * confidence
+ * Dimension scores are 0-100, weights sum to ~1, so the total naturally maps to 0-100.
+ * Confidence gates the contribution: if grounding validation stripped all evidence
+ * (confidence=0), that dimension contributes nothing regardless of its raw score.
  *
  * Red flags deduct from the total: low=-2, medium=-5, high=-10 (configurable).
  * Total is clamped to [0, 100].
@@ -47,7 +49,8 @@ export function calculateScore(
   const breakdown: ScoreComponent[] = DIMENSION_NAMES.map((dim) => {
     const signal: SignalDimension = signals[dim];
     const weight = weights[dim] ?? 0;
-    const weighted = signal.score * weight * 10;
+    // Confidence gates the contribution: zero evidence → zero contribution
+    const weighted = signal.score * weight * signal.confidence;
 
     return {
       dimension: dim,

@@ -264,6 +264,16 @@ export function createEnrichHandler(
               if (!existingPii.has(`${p.adapter}:${p.value}`)) primary.pii.fields.push(p);
             }
 
+            // Merge observed identifiers (deduplicate by type:value)
+            const existingIdKeys = new Set(
+              primary.identity.observedIdentifiers.map((id) => `${id.type}:${id.value}`),
+            );
+            for (const id of duplicate.identity.observedIdentifiers) {
+              if (!existingIdKeys.has(`${id.type}:${id.value}`)) {
+                primary.identity.observedIdentifiers.push(id);
+              }
+            }
+
             // Merge enrichments and sources
             for (const [k, v] of Object.entries(duplicate.enrichments)) {
               if (!primary.enrichments[k]) primary.enrichments[k] = v;
@@ -301,6 +311,9 @@ export function createEnrichHandler(
   };
 }
 
+// Rough cost estimate per LLM call (signal extraction + narrative = 2 calls per candidate)
+const ESTIMATED_COST_PER_SCORING_CALL = 0.005;
+
 export function createScoreHandler(
   searchConfig: SearchConfig,
   talentProfile: TalentProfile,
@@ -310,38 +323,56 @@ export function createScoreHandler(
     async execute(input) {
       const scoredCandidates: ScoredCandidate[] = [];
       let costIncurred = 0;
+      const failures: { item: string; error: string; retryable: boolean }[] = [];
 
       for (const candidate of input.candidates) {
-        // 5.1: Extract signals via LLM
-        const { signals } = await extractSignals(candidate, talentProfile, provider);
+        try {
+          // 5.1: Extract signals via LLM
+          const { signals } = await extractSignals(candidate, talentProfile, provider);
+          costIncurred += ESTIMATED_COST_PER_SCORING_CALL;
 
-        // 5.2: Calculate weighted score
-        const score = calculateScore(signals, searchConfig.scoringWeights);
+          // 5.2: Calculate weighted score
+          const score = calculateScore(signals, searchConfig.scoringWeights);
 
-        // 5.4: Assign tier
-        const tier = assignTier(score.total, searchConfig.tierThresholds);
+          // 5.4: Assign tier
+          const tier = assignTier(score.total, searchConfig.tierThresholds);
 
-        // 5.3: Generate narrative via LLM
-        const narrative = await generateNarrative(
-          candidate,
-          talentProfile,
-          signals,
-          score,
-          provider,
-        );
+          // 5.3: Generate narrative via LLM
+          const narrative = await generateNarrative(
+            candidate,
+            talentProfile,
+            signals,
+            score,
+            provider,
+          );
+          costIncurred += ESTIMATED_COST_PER_SCORING_CALL;
 
-        scoredCandidates.push({
-          ...candidate,
-          signals,
-          score,
-          narrative,
-          tier,
-        });
+          scoredCandidates.push({
+            ...candidate,
+            signals,
+            score,
+            narrative,
+            tier,
+          });
+        } catch (err) {
+          // Per-candidate fault isolation: log failure, continue with remaining
+          failures.push({
+            item: candidate.id,
+            error: err instanceof Error ? err.message : String(err),
+            retryable: true,
+          });
+        }
       }
 
+      const hasFailures = failures.length > 0;
+      const output = { candidates: scoredCandidates, costIncurred };
+
       return {
-        status: 'completed',
-        data: { candidates: scoredCandidates, costIncurred },
+        status: hasFailures ? 'partial' : 'completed',
+        data: hasFailures ? undefined : output,
+        partialData: hasFailures ? output : undefined,
+        failures: hasFailures ? failures : undefined,
+        costIncurred,
       };
     },
   };

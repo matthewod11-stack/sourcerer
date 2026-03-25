@@ -126,7 +126,6 @@ export class GitHubAdapter implements DataSource {
     options?: EnrichBatchOptions,
   ): Promise<BatchResult<EnrichmentResult>> {
     const staleTtlMs = options?.staleTtlMs ?? DEFAULT_STALE_TTL_MS;
-    const maxConcurrent = this.client.authenticated ? 5 : 2;
 
     const succeeded: { candidateId: string; result: EnrichmentResult }[] = [];
     const failed: { candidateId: string; error: Error; retryable: boolean }[] = [];
@@ -140,7 +139,6 @@ export class GitHubAdapter implements DataSource {
       if (existing && existing.enrichedAt) {
         const enrichedAtMs = new Date(existing.enrichedAt).getTime();
         if (now - enrichedAtMs < staleTtlMs) {
-          // Still fresh — use cached result
           succeeded.push({ candidateId: candidate.id, result: existing });
           continue;
         }
@@ -148,67 +146,28 @@ export class GitHubAdapter implements DataSource {
       toEnrich.push(candidate);
     }
 
-    // Inline semaphore for concurrency control
-    let active = 0;
+    // Sequential processing: each enrich() call has its own internal delays.
+    // Running sequentially ensures the shared rate limit is respected —
+    // concurrent candidates would multiply actual request rate.
     let rateLimited = false;
-    const queue: Array<() => void> = [];
 
-    const acquireSemaphore = (): Promise<void> => {
-      if (active < maxConcurrent) {
-        active++;
-        return Promise.resolve();
-      }
-      return new Promise<void>((resolve) => {
-        queue.push(() => {
-          active++;
-          resolve();
-        });
-      });
-    };
-
-    const releaseSemaphore = (): void => {
-      active--;
-      const next = queue.shift();
-      if (next) next();
-    };
-
-    // Process candidates with semaphore-controlled concurrency
-    const unprocessedTracker = { remaining: new Set(toEnrich.map((c) => c.id)) };
-
-    const processOne = async (candidate: Candidate): Promise<void> => {
-      // If rate-limited, immediately mark as retryable failure
+    for (const candidate of toEnrich) {
       if (rateLimited) {
         failed.push({
           candidateId: candidate.id,
           error: new Error('Rate limit exhausted — skipped'),
           retryable: true,
         });
-        return;
-      }
-
-      await acquireSemaphore();
-
-      // Re-check after acquiring — rate limit may have been hit while waiting
-      if (rateLimited) {
-        releaseSemaphore();
-        failed.push({
-          candidateId: candidate.id,
-          error: new Error('Rate limit exhausted — skipped'),
-          retryable: true,
-        });
-        return;
+        continue;
       }
 
       try {
         const result = await this.enrich(candidate);
-        unprocessedTracker.remaining.delete(candidate.id);
         succeeded.push({ candidateId: candidate.id, result });
       } catch (err) {
-        unprocessedTracker.remaining.delete(candidate.id);
         const isRateLimit = err instanceof GitHubApiError && err.isRateLimit;
 
         if (isRateLimit) {
-          // Set flag — all subsequent candidates will be marked retryable
           rateLimited = true;
           failed.push({
             candidateId: candidate.id,
@@ -222,13 +181,8 @@ export class GitHubAdapter implements DataSource {
             retryable: false,
           });
         }
-      } finally {
-        releaseSemaphore();
       }
-    };
-
-    // Launch all with semaphore gating
-    await Promise.all(toEnrich.map((candidate) => processOne(candidate)));
+    }
 
     return { succeeded, failed, costIncurred: 0 };
   }
