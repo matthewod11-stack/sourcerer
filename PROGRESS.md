@@ -15,8 +15,10 @@
 - **Phase 5.3:** Narrative generation — LLM narrative with evidence citations via `provider.chat()`. 8 tests.
 - **Phase 5.5:** CLI wiring — `createScoreHandler` replaces stub in pipeline, AI provider instantiated in run command. Stub kept for test use.
 
+- **Phase 5 review fixes:** 5 findings addressed — score math scale (removed ×10), confidence gates score contribution, GitHub sequential processing, identity merge includes observedIdentifiers, score handler fault isolation + cost tracking.
+
 ### Stats
-- **Tests:** 394 → 497 (+103 new tests)
+- **Tests:** 394 → 498 (+104 new tests)
 - **New packages:** adapter-x, adapter-hunter (2 fully built)
 - **Packages substantially modified:** adapter-github (hardened), scoring (built from empty), cli (orchestrator + score wiring)
 
