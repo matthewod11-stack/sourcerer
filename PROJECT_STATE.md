@@ -1,9 +1,13 @@
-# PROJECT_STATE.md
+# Sourcerer — Project State
 
 > Cross-surface context document. Shared across Claude Chat, Claude Code, and Cowork sessions.
-> Last updated: 2026-03-23
+> Last updated: 2026-03-24
 
 ---
+
+## Elevator Pitch
+
+Recruiting agencies charge $30-60K per hire and still take months. Sourcerer is an AI-powered talent sourcing agent that does in minutes what a recruiter does in weeks — it has a conversation with a hiring manager to understand the role, then autonomously searches the web, discovers candidates, enriches them with GitHub/Twitter/email signals, scores them with transparent evidence, and delivers structured results ready for outreach. The business model is open-source tool + done-for-you service, and it's already shipped two client engagements.
 
 ## Project Overview
 

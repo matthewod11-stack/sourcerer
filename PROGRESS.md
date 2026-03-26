@@ -2,6 +2,30 @@
 
 ---
 
+## Session: 2026-03-26 08:00 — Data Source Strategy Research
+
+### Completed
+- **Git pull:** Synced 96 files changed from previous session (Phases 4-5 work)
+- **Environment fix:** Ran `pnpm install` to resolve missing `node_modules` in new packages (adapter-x, adapter-hunter)
+- **Data source research:** Deep research into Apify actor store and alternative sourcing APIs using parallel research agents
+- **Strategy document:** Wrote formal data source strategy addendum at `docs/specs/2026-03-26-data-source-strategy.md`
+  - 4 Tier 1 adapters: adapter-apollo (free, replaces Hunter for email), adapter-apify (LinkedIn + Google, $50/mo budget), enricher-stackoverflow (free), enricher-ecosystems (free)
+  - 4 Tier 2 options: Pearch, PDL, Semantic Scholar, DEV.to
+  - Tier 3 skips with rationale (ContactOut, RocketReach, Clearbit/Breeze dead, Proxycurl dead)
+  - Implementation sequence (Phase 8A-8D), architecture, config changes, legal considerations
+
+### Issues Encountered
+- Vercel plugin hooks keep firing for Next.js/Vercel skills (auth, chat-sdk, etc.) despite this being a CLI project — false positives, no impact on work
+- `adapter-x` build failed after pull due to missing `node_modules` — fixed by `pnpm install`
+
+### Next Session Should
+- **Phase 6:** Output adapters (output-csv, output-notion, CLI results display) — the current roadmap priority
+- Consider integrating the data source strategy into the main roadmap as Phase 8 (or reorganize Phases 7/8)
+- When building Phase 8: start with `adapter-apollo` (free, highest ROI, replaces Hunter for email)
+- Live smoke test with real API keys still pending from Phase 5
+
+---
+
 ## Session: 2026-03-25 13:30 — Phase 4 + Phase 5 (Enrichment Adapters + Scoring Engine)
 
 ### Completed
