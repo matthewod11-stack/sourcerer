@@ -2,6 +2,105 @@
 
 ---
 
+## Session: 2026-03-23 (cont.) — Phase 2.1: Onboarding Wizard
+
+### Completed
+- `sourcerer init` interactive wizard: AI provider selection, Exa key entry, optional adapter multi-select, per-adapter key walkthrough, defaults (TTL, budget), config summary
+- `sourcerer config show` displays config YAML with redacted API keys
+- `sourcerer config reset` re-runs init wizard
+- Added `@inquirer/prompts` dependency for interactive CLI prompts
+- `init` removed from stub commands, routed to real handler
+- Adapter metadata with names, descriptions, costs, signup URLs
+- Existing config overwrite confirmation
+- 7 new tests, **137 total tests passing** (118 core + 19 CLI)
+
+### Next Session Should
+- Phase 2.2: adapter-exa (DataSource implementation)
+
+---
+
+## Session: 2026-03-23 (cont.) — Phase 1.7: Test Protocol
+
+### Completed
+- Benchmark role fixture (`test-fixtures/benchmark-role.json`): "Senior Backend Engineer for DeFi startup" with known-good and known-bad candidate profiles, expected scores and tiers
+- Dedup test candidates fixture (`test-fixtures/dedup-candidates.json`): 10 candidates representing 5 real people across 3 merge groups + 1 single + 1 similar-but-different non-merge
+- Integration test (`dedup-fixtures.test.ts`): loads fixture, verifies merge groups, confirms non-merge, checks idempotency
+- Test protocol document (`docs/test-protocol.md`): manual validation protocol for Tier 1 precision, dedup accuracy, cost per run
+- Cost tracking already wired from Phase 1.4: `SearchPage.costIncurred`, `BatchResult.costIncurred`, `CostTracker`, `RunMeta.cost`
+- 4 new fixture tests, **130 total tests passing** (118 core + 12 CLI)
+
+### Phase 1 Complete!
+All 7 sub-phases (1.1-1.7) done. Foundation is solid:
+- 40+ types/interfaces, identity resolver, pipeline runner, config system, CLI skeleton
+- 130 tests passing, 0 failures
+- Ready for Phase 2: Onboarding + First Adapter (Exa + GitHub)
+
+---
+
+## Session: 2026-03-23 (cont.) — Phase 1.6: CLI Skeleton
+
+### Completed
+- Command dispatcher with argv-based routing (no framework, 10 commands)
+- `sourcerer --help` shows all commands with descriptions
+- `sourcerer --version` shows version
+- `sourcerer config status` reads `~/.sourcerer/config.yaml`, validates, displays adapter status table
+- All other commands (init, intake, run, discover, enrich, score, results, runs, candidates) print "not yet implemented"
+- `config-io.ts` — YAML file I/O bridge (js-yaml → core's validateConfig)
+- Unknown commands show helpful error with suggestion
+- Added `js-yaml` and `chalk` dependencies to CLI
+- 12 new tests, **126 total tests passing** (114 core + 12 CLI)
+
+### Next Session Should
+- Build test protocol (Phase 1.7) — benchmark fixtures, cost tracking instrumentation
+- Then Phase 2: Onboarding wizard + first adapter (Exa) + adapter-github
+
+---
+
+## Session: 2026-03-23 (cont.) — Phase 1.5: Config System
+
+### Completed
+- `SourcererConfig` type with adapter configs, AI provider, retention TTL, budget defaults
+- `validateConfig(raw: unknown)` with multi-error collection and clear messages
+- `ConfigValidationError` class with `errors: string[]` field
+- `applyDefaults()` for missing optionals (90-day retention, GitHub auto-enabled, JSON output)
+- `getConfiguredAdapters()` and `getAdapterApiKey()` utilities
+- Constants: `CONFIG_PATH`, `KNOWN_ADAPTERS`, `AI_PROVIDER_NAMES`
+- Core remains zero-dep — validation operates on parsed JS objects, YAML I/O deferred to CLI
+- 19 new tests, **114 total tests passing** across core
+
+### Next Session Should
+- Build CLI skeleton (Phase 1.6) — command routing, `sourcerer config status`, prompt library
+- Build test protocol (Phase 1.7) — benchmark fixtures, cost tracking instrumentation
+
+---
+
+## Session: 2026-03-23 (cont.) — Phase 1.4: Pipeline Runner
+
+### Completed
+- Built PipelineRunner class with handler injection pattern: each phase accepts a `PhaseHandler<TInput, TOutput>`
+- Typed phase chain: intake → discover → dedup → enrich → score → output with compile-time verified data flow
+- Checkpoint system: JSON serialization to disk after each phase, loadable for resume
+- Resume logic: loads checkpoint, restores cost state, starts from phase after last completed
+- CostTracker class: per-phase and per-adapter cost accumulation, budget enforcement
+- Run artifact management: `YYYY-MM-DD-<role>` directories, `run-meta.json`, `evidence/` subdir, `writeArtifact` helper
+- `createDedupHandler()` factory wiring IdentityResolver as the built-in dedup phase handler
+- Partial failure handling: `partial` status stores successes, logs failures, downstream continues
+- 5 new files: `pipeline-types.ts`, `cost-tracker.ts`, `run-artifacts.ts`, `checkpoint.ts`, `pipeline-runner.ts`
+- 26 new tests, **95 total tests passing** across core (21 types + 48 identity resolver + 26 pipeline runner)
+
+### Design Decisions
+- Handler injection pattern over monolithic runner — later phases plug in without modifying runner
+- Simple `for` loop over `PHASE_ORDER` instead of graph-based state machine — pipeline is always linear
+- Checkpoint written after full phase (not intra-phase) — acceptable at V1 scale
+- `PhaseResult.failures[].error` is `string` not `Error` for JSON serialization survival
+
+### Next Session Should
+- Build config system (Phase 1.5) — `~/.sourcerer/config.yaml` read/write, validation
+- Build CLI skeleton (Phase 1.6) — command routing, `@clack/prompts` integration
+- Build test protocol (Phase 1.7) — benchmark fixtures, cost tracking instrumentation
+
+---
+
 ## Session: 2026-03-23 (cont.) — Phase 1.3: Identity Resolution Engine
 
 ### Completed
