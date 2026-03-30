@@ -1,16 +1,17 @@
 # Overnight Agent
 
-Autonomous overnight agent for resolving tech-debt GitHub issues via scheduled Claude Code remote triggers.
+Autonomous overnight agent for resolving tech-debt GitHub issues via Claude Desktop local scheduled task.
 
 ## How It Works
 
-1. A scheduled trigger runs nightly at 2am Pacific
-2. The agent reads open `tech-debt` issues, filters out design-decision issues
+1. A Desktop local task runs nightly at 2:00 AM PT
+2. The agent reads open `tech-debt` issues, filters out design-decision/deferred/in-progress
 3. Picks up to 3 mechanical issues per run (oldest first)
 4. Creates a branch + PR for each fix, or comments if it needs to bail
 5. You review PRs in the morning
+6. Run log written to `state/overnight-agent-log.json`
 
-**Manage triggers:** https://claude.ai/code/scheduled
+**Task prompt:** `prompts/overnight-agent.md`
 
 ## Autonomous Agent Prompt
 

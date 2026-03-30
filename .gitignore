@@ -36,3 +36,6 @@ runs/
 
 # Cache
 .cache/
+
+# Overnight agent state
+state/

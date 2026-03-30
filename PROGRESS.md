@@ -2,6 +2,25 @@
 
 ---
 
+## Session: 2026-03-30 08:15 — Local Overnight Agent Setup
+
+### Completed
+- **Adapted overnight agent for Desktop local task:** Updated `docs/OVERNIGHT_AGENT.md` header from remote trigger → Desktop local scheduled task, added state log reference
+- **Created `prompts/overnight-agent.md`:** Thin Desktop task entry point, points to docs for full prompt, defines JSON run log format for `state/overnight-agent-log.json`
+- **Created `state/` directory** for runtime artifacts (overnight agent logs)
+- **Updated `.gitignore`:** Added `state/` to prevent committing runtime artifacts
+- **Updated `CLAUDE.md`:** Added overnight agent files to Key Files section
+
+### Issues Encountered
+- None
+
+### Next Session Should
+- **Phase 6:** Output adapters (output-csv, output-notion, CLI results display) — the current roadmap priority
+- Create Desktop local task manually (config reported in session)
+- Live smoke test with real API keys still pending from Phase 5
+
+---
+
 ## Session: 2026-03-30 07:40 — Issue-Driven Maintenance Setup
 
 ### Completed
@@ -226,25 +245,6 @@
 
 ### Next Session Should
 - Phase 2.4: output-json + output-markdown (OutputAdapter implementations)
-
----
-
-## Session: 2026-03-23 (cont.) — Phase 2.2: adapter-exa
-
-### Completed
-- `ExaAdapter` class implementing full `DataSource` interface from `@sourcerer/core`
-- `search()` as AsyncGenerator<SearchPage>: P0 similarity seeds first, then P1-P4 tiered queries with rate limiting
-- `findSimilar()` wrapping Exa's `findSimilar` API with provenance tracking in evidence items
-- `enrich()` and `enrichBatch()` for URL content enrichment via `getContents()`
-- `healthCheck()` and `estimateCost()` implementations
-- `parsers.ts` — identifier extraction from Exa results (LinkedIn, GitHub, Twitter, email, personal URL)
-- `rate-limiter.ts` — simple delay-based rate limiter (timestamp-based, no deps)
-- Evidence grounding: every discovery/enrichment result generates `EvidenceItem` via `generateEvidenceId()`
-- Added `exa-js` SDK dependency
-- 20 new tests with fully mocked Exa SDK, **157 total tests passing** (118 core + 19 CLI + 20 exa)
-
-### Next Session Should
-- Phase 2.3: adapter-github (enrichment-only DataSource)
 
 
 

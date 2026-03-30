@@ -2,6 +2,25 @@
 
 ---
 
+## Session: 2026-03-23 (cont.) — Phase 2.2: adapter-exa
+
+### Completed
+- `ExaAdapter` class implementing full `DataSource` interface from `@sourcerer/core`
+- `search()` as AsyncGenerator<SearchPage>: P0 similarity seeds first, then P1-P4 tiered queries with rate limiting
+- `findSimilar()` wrapping Exa's `findSimilar` API with provenance tracking in evidence items
+- `enrich()` and `enrichBatch()` for URL content enrichment via `getContents()`
+- `healthCheck()` and `estimateCost()` implementations
+- `parsers.ts` — identifier extraction from Exa results (LinkedIn, GitHub, Twitter, email, personal URL)
+- `rate-limiter.ts` — simple delay-based rate limiter (timestamp-based, no deps)
+- Evidence grounding: every discovery/enrichment result generates `EvidenceItem` via `generateEvidenceId()`
+- Added `exa-js` SDK dependency
+- 20 new tests with fully mocked Exa SDK, **157 total tests passing** (118 core + 19 CLI + 20 exa)
+
+### Next Session Should
+- Phase 2.3: adapter-github (enrichment-only DataSource)
+
+---
+
 ## Session: 2026-03-23 (cont.) — Phase 2.1: Onboarding Wizard
 
 ### Completed

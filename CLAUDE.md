@@ -58,6 +58,9 @@ pnpm clean            # Remove all dist/ and tsbuildinfo
 - `docs/roadmap.md` — Implementation roadmap (validated)
 - `DESIGN-sourcerer-strategy-2026-03-20.md` — Product strategy and business context
 - `PROJECT_STATE.md` — Cross-surface context sync (Claude Chat, Claude Code, Cowork)
+- `docs/OVERNIGHT_AGENT.md` — Autonomous tech-debt agent prompt + issue template
+- `prompts/overnight-agent.md` — Desktop task entry point for overnight agent
+- `state/overnight-agent-log.json` — Run log (gitignored, written by overnight agent)
 
 ## Conventions
 
