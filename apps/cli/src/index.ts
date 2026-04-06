@@ -62,6 +62,13 @@ async function main(): Promise<void> {
     return;
   }
 
+  // Results command
+  if (command === 'results') {
+    const { resultsCommand } = await import('./commands/results.js');
+    await resultsCommand(args.slice(1));
+    return;
+  }
+
   // Init command
   if (command === 'init') {
     await runInit();

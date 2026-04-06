@@ -81,8 +81,11 @@ function renderCandidateCard(
   rank: number,
 ): string {
   const lines: string[] = [];
+  const lowConfTag = candidate.identity.lowConfidenceMerge
+    ? ' **[Low-Confidence Merge]**'
+    : '';
   lines.push(
-    `### ${rank}. ${candidate.name} — ${Math.round(candidate.score.total)}/100`,
+    `### ${rank}. ${candidate.name} — ${Math.round(candidate.score.total)}/100${lowConfTag}`,
   );
   lines.push('');
   lines.push(`> ${candidate.narrative}`);

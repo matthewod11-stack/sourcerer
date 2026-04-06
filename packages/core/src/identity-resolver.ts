@@ -53,7 +53,7 @@ export interface ResolveResult {
     outputCount: number;
     highConfidenceMerges: number;
     mediumConfidenceMerges: number;
-    lowConfidenceSkipped: number;
+    lowConfidenceMerges: number;
   };
 }
 
@@ -257,7 +257,10 @@ function chooseBestName(cluster: CandidateCluster): string {
   return best;
 }
 
-function clusterToCandidate(cluster: CandidateCluster): Candidate {
+function clusterToCandidate(
+  cluster: CandidateCluster,
+  lowConfidenceMerge = false,
+): Candidate {
   const allIdentifiers = cluster.allIdentifiers;
   const canonicalId = generateCanonicalId(allIdentifiers);
 
@@ -278,17 +281,17 @@ function clusterToCandidate(cluster: CandidateCluster): Candidate {
     piiFields.push(...raw.piiFields);
   }
 
-  // Minimum merge confidence across all contributing decisions
-  const mergeConfidence = cluster.rawCandidates.length === 1 ? 1.0 : 0.95;
+  const wasMerged = cluster.rawCandidates.length > 1;
+  const mergeConfidence = !wasMerged ? 1.0 : lowConfidenceMerge ? 0.7 : 0.95;
 
   const identity: PersonIdentity = {
     canonicalId,
     observedIdentifiers: allIdentifiers,
-    mergedFrom:
-      cluster.rawCandidates.length > 1
-        ? cluster.rawCandidates.map((r) => r.sourceData.adapter)
-        : undefined,
+    mergedFrom: wasMerged
+      ? cluster.rawCandidates.map((r) => r.sourceData.adapter)
+      : undefined,
     mergeConfidence,
+    ...(lowConfidenceMerge ? { lowConfidenceMerge: true } : {}),
   };
 
   return {
@@ -316,7 +319,7 @@ export class IdentityResolver {
           outputCount: 0,
           highConfidenceMerges: 0,
           mediumConfidenceMerges: 0,
-          lowConfidenceSkipped: 0,
+          lowConfidenceMerges: 0,
         },
       };
     }
@@ -358,14 +361,23 @@ export class IdentityResolver {
       mediumCount++;
     }
 
-    // Pass 4: Low-confidence (similar name + similar company) — collect, don't apply
-    const pass4Pending = this.findLowConfidenceMerges(clusters);
-    pendingMerges.push(...pass4Pending);
-    lowCount = pass4Pending.length;
+    // Pass 4: Low-confidence (similar name + similar company) — auto-merge with flag
+    const pass4Decisions = this.findLowConfidenceMergeDecisions(clusters);
+    const lowConfidenceMergedClusters = new Set<number>();
+    for (const decision of pass4Decisions) {
+      lowConfidenceMergedClusters.add(decision.clusterIndexA);
+      clusters = this.applyMerge(clusters, decision);
+      mergeLog.push(decision);
+      lowCount++;
+    }
 
     // Build final candidates from surviving clusters
     const activeClusters = clusters.filter((c) => !c.merged);
-    const candidates = activeClusters.map((c) => clusterToCandidate(c));
+    const candidates = activeClusters.map((c, idx) => {
+      const originalIdx = clusters.indexOf(c);
+      const isLowConfidence = lowConfidenceMergedClusters.has(originalIdx);
+      return clusterToCandidate(c, isLowConfidence);
+    });
 
     return {
       candidates,
@@ -376,7 +388,7 @@ export class IdentityResolver {
         outputCount: candidates.length,
         highConfidenceMerges: highCount,
         mediumConfidenceMerges: mediumCount,
-        lowConfidenceSkipped: lowCount,
+        lowConfidenceMerges: lowCount,
       },
     };
   }
@@ -570,12 +582,12 @@ export class IdentityResolver {
     return decisions;
   }
 
-  // --- Pass 4: Low-confidence (similar name + company) → PendingMerge only ---
+  // --- Pass 4: Low-confidence (similar name + company) → auto-merge with flag ---
 
-  private findLowConfidenceMerges(
+  private findLowConfidenceMergeDecisions(
     clusters: CandidateCluster[],
-  ): PendingMerge[] {
-    const pending: PendingMerge[] = [];
+  ): MergeDecision[] {
+    const decisions: MergeDecision[] = [];
 
     for (let i = 0; i < clusters.length; i++) {
       if (clusters[i].merged) continue;
@@ -613,26 +625,21 @@ export class IdentityResolver {
         }
         if (!similarCompany) continue;
 
-        pending.push({
-          candidateA: {
-            name: clusters[i].rawCandidates[0].name,
-            identifiers: clusters[i].allIdentifiers,
-          },
-          candidateB: {
-            name: clusters[j].rawCandidates[0].name,
-            identifiers: clusters[j].allIdentifiers,
-          },
+        decisions.push({
+          clusterIndexA: i,
+          clusterIndexB: j,
           reason: {
             rule: 'similar_name_company',
             confidence: 'low',
             matchedValues: [namesA[0], namesB[0]],
             description: 'Similar name + similar company',
           },
+          automatic: true,
         });
       }
     }
 
-    return pending;
+    return decisions;
   }
 
   // --- Merge Application ---

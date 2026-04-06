@@ -27,4 +27,6 @@ export interface PersonIdentity {
   observedIdentifiers: ObservedIdentifier[];
   mergedFrom?: string[];
   mergeConfidence: number;
+  /** True when candidate was auto-merged via low-confidence rule (similar name + similar company) */
+  lowConfidenceMerge?: boolean;
 }

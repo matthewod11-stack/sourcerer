@@ -9,9 +9,14 @@
     { "path": "../../packages/core" },
     { "path": "../../packages/intake" },
     { "path": "../../packages/adapters/adapter-exa" },
+    { "path": "../../packages/adapters/adapter-github" },
+    { "path": "../../packages/adapters/adapter-hunter" },
+    { "path": "../../packages/adapters/adapter-x" },
     { "path": "../../packages/scoring" },
+    { "path": "../../packages/output/output-csv" },
     { "path": "../../packages/output/output-json" },
     { "path": "../../packages/output/output-markdown" },
+    { "path": "../../packages/output/output-notion" },
     { "path": "../../packages/ai" }
   ]
 }

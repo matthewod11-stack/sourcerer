@@ -310,8 +310,8 @@ describe('Medium-confidence merges', () => {
   });
 });
 
-describe('Low-confidence merges (pending)', () => {
-  it('flags similar name + similar company as pending', () => {
+describe('Low-confidence merges (auto-merge with flag)', () => {
+  it('auto-merges similar name + similar company with lowConfidenceMerge flag', () => {
     // "Sara" vs "Sarah" = Levenshtein 1 (similar name, not exact)
     // "Chainklnk" vs "Chainlink" = Levenshtein 1 (similar company, not exact)
     const result = resolver.resolve([
@@ -326,10 +326,29 @@ describe('Low-confidence merges (pending)', () => {
         identifiers: [makeId('name_company', 'Sarah Chen|Chainlink', 'github')],
       }),
     ]);
-    // Should NOT merge (low confidence), but should flag as pending
-    expect(result.candidates).toHaveLength(2);
-    expect(result.pendingMerges.length).toBeGreaterThanOrEqual(1);
-    expect(result.stats.lowConfidenceSkipped).toBeGreaterThanOrEqual(1);
+    // Should auto-merge with low-confidence flag
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0].identity.lowConfidenceMerge).toBe(true);
+    expect(result.candidates[0].identity.mergeConfidence).toBe(0.7);
+    expect(result.stats.lowConfidenceMerges).toBe(1);
+  });
+
+  it('sets mergeConfidence to 0.95 for high/medium merges (not flagged)', () => {
+    const result = resolver.resolve([
+      makeRawCandidate({
+        name: 'Alice',
+        adapter: 'exa',
+        identifiers: [makeId('email', 'alice@example.com', 'exa')],
+      }),
+      makeRawCandidate({
+        name: 'Alice',
+        adapter: 'github',
+        identifiers: [makeId('email', 'alice@example.com', 'github')],
+      }),
+    ]);
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0].identity.lowConfidenceMerge).toBeUndefined();
+    expect(result.candidates[0].identity.mergeConfidence).toBe(0.95);
   });
 });
 

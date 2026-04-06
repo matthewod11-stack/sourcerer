@@ -4,7 +4,6 @@ const STUB_COMMANDS = [
   'discover',
   'enrich',
   'score',
-  'results',
   'runs',
   'candidates',
 ] as const;

@@ -50,12 +50,18 @@ importers:
       '@sourcerer/intake':
         specifier: workspace:*
         version: link:../../packages/intake
+      '@sourcerer/output-csv':
+        specifier: workspace:*
+        version: link:../../packages/output/output-csv
       '@sourcerer/output-json':
         specifier: workspace:*
         version: link:../../packages/output/output-json
       '@sourcerer/output-markdown':
         specifier: workspace:*
         version: link:../../packages/output/output-markdown
+      '@sourcerer/output-notion':
+        specifier: workspace:*
+        version: link:../../packages/output/output-notion
       '@sourcerer/scoring':
         specifier: workspace:*
         version: link:../../packages/scoring
@@ -123,6 +129,15 @@ importers:
         specifier: ^3.24.0
         version: 3.25.76
 
+  packages/output/output-csv:
+    dependencies:
+      '@sourcerer/core':
+        specifier: workspace:*
+        version: link:../../core
+      csv-stringify:
+        specifier: ^6.5.2
+        version: 6.7.0
+
   packages/output/output-json:
     dependencies:
       '@sourcerer/core':
@@ -131,6 +146,15 @@ importers:
 
   packages/output/output-markdown:
     dependencies:
+      '@sourcerer/core':
+        specifier: workspace:*
+        version: link:../../core
+
+  packages/output/output-notion:
+    dependencies:
+      '@notionhq/client':
+        specifier: ^2.2.15
+        version: 2.3.0
       '@sourcerer/core':
         specifier: workspace:*
         version: link:../../core
@@ -445,6 +469,10 @@ packages:
   '@jridgewell/sourcemap-codec@1.5.5':
     resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
 
+  '@notionhq/client@2.3.0':
+    resolution: {integrity: sha512-l7WqTCpQqC+HibkB9chghONQTYcxNQT0/rOJemBfmuKQRTu2vuV8B3yA395iKaUdDo7HI+0KvQaz9687Xskzkw==}
+    engines: {node: '>=12'}
+
   '@rollup/rollup-android-arm-eabi@4.60.0':
     resolution: {integrity: sha512-WOhNW9K8bR3kf4zLxbfg6Pxu2ybOUbB2AjMDHSQx86LIF4rH4Ft7vmMwNt0loO0eonglSNy4cpD3MKXXKQu0/A==}
     cpu: [arm]
@@ -714,6 +742,9 @@ packages:
 
   cross-fetch@4.1.0:
     resolution: {integrity: sha512-uKm5PU+MHTootlWEY+mZ4vvXoCn4fLQxT9dSc1sXVMSFkINTJVN8cAQROpwcKm8bJ/c7rgZVIBWzH5T78sNZZw==}
+
+  csv-stringify@6.7.0:
+    resolution: {integrity: sha512-UdtziYp5HuTz7e5j8Nvq+a/3HQo+2/aJZ9xntNTpmRRIg/3YYqDVgiS9fvAhtNbnyfbv2ZBe0bqCHqzhE7FqWQ==}
 
   debug@4.4.3:
     resolution: {integrity: sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==}
@@ -1321,6 +1352,13 @@ snapshots:
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
+  '@notionhq/client@2.3.0':
+    dependencies:
+      '@types/node-fetch': 2.6.13
+      node-fetch: 2.7.0
+    transitivePeerDependencies:
+      - encoding
+
   '@rollup/rollup-android-arm-eabi@4.60.0':
     optional: true
 
@@ -1526,6 +1564,8 @@ snapshots:
       node-fetch: 2.7.0
     transitivePeerDependencies:
       - encoding
+
+  csv-stringify@6.7.0: {}
 
   debug@4.4.3:
     dependencies:

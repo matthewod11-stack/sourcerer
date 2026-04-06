@@ -16,8 +16,7 @@ import { ExaAdapter } from '@sourcerer/adapter-exa';
 import { GitHubAdapter } from '@sourcerer/adapter-github';
 import { XAdapter } from '@sourcerer/adapter-x';
 import { HunterAdapter } from '@sourcerer/adapter-hunter';
-import { JsonOutputAdapter } from '@sourcerer/output-json';
-import { MarkdownOutputAdapter } from '@sourcerer/output-markdown';
+import { resolveOutputAdapter } from '../adapter-registry.js';
 import { createAIProvider } from '@sourcerer/ai';
 import { loadConfigFromDisk, configFileExists } from '../config-io.js';
 import {
@@ -178,13 +177,14 @@ export async function runCommand(args: string[]): Promise<void> {
 
   const outputAdapters: OutputAdapter[] = [];
   for (const fmt of formats) {
-    if (fmt === 'json') outputAdapters.push(new JsonOutputAdapter());
-    else if (fmt === 'markdown') outputAdapters.push(new MarkdownOutputAdapter());
+    const adapter = resolveOutputAdapter(fmt);
+    if (adapter) outputAdapters.push(adapter);
     else console.warn(chalk.yellow(`Unknown output format: ${fmt}, skipping`));
   }
 
   if (outputAdapters.length === 0) {
-    outputAdapters.push(new JsonOutputAdapter());
+    const fallback = resolveOutputAdapter('json');
+    if (fallback) outputAdapters.push(fallback);
   }
 
   // Create AI provider for scoring

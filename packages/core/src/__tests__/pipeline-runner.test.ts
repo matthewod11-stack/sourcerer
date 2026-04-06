@@ -335,7 +335,7 @@ describe('PipelineRunner', () => {
         dedup: {
           async execute(input: DiscoverPhaseOutput) {
             phases.push('dedup');
-            return { status: 'completed', data: { candidates: [], resolveResult: { candidates: [], mergeLog: [], pendingMerges: [], stats: { inputCount: 0, outputCount: 0, highConfidenceMerges: 0, mediumConfidenceMerges: 0, lowConfidenceSkipped: 0 } } } };
+            return { status: 'completed', data: { candidates: [], resolveResult: { candidates: [], mergeLog: [], pendingMerges: [], stats: { inputCount: 0, outputCount: 0, highConfidenceMerges: 0, mediumConfidenceMerges: 0, lowConfidenceMerges: 0 } } } };
           },
         },
       };
@@ -529,7 +529,7 @@ describe('PipelineRunner', () => {
                 candidates: [],
                 resolveResult: {
                   candidates: [], mergeLog: [], pendingMerges: [],
-                  stats: { inputCount: 0, outputCount: 0, highConfidenceMerges: 0, mediumConfidenceMerges: 0, lowConfidenceSkipped: 0 },
+                  stats: { inputCount: 0, outputCount: 0, highConfidenceMerges: 0, mediumConfidenceMerges: 0, lowConfidenceMerges: 0 },
                 },
               },
             };
