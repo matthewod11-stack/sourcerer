@@ -83,4 +83,4 @@ pnpm clean            # Remove all dist/ and tsbuildinfo
 
 Turbo builds in topological order: `core` → 6 packages in parallel → `cli`.
 
-See `docs/roadmap.md` for full phased plan. Currently: Phases 1-6 COMPLETE. Next: Phase 7 (Polish & Advanced — output-sheets, post-discovery expansion, premium adapters).
+See `docs/roadmap.md` for full phased plan. Currently: Phases 1-6 + 7.1/7.3/7.4 COMPLETE. Remaining Phase 7: 7.2 (post-discovery expansion), 7.5 (premium adapters), 7.6 (output-sheets), 7.7 (advanced intake).
