@@ -39,3 +39,11 @@ runs/
 
 # Overnight agent state
 state/
+
+# Internal dev tracking (not public)
+PROGRESS.md
+PROGRESS_ARCHIVE.md
+PROJECT_STATE.md
+DESIGN-sourcerer-strategy-*.md
+AGENTS.md
+prompts/
