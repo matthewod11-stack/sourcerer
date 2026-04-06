@@ -462,10 +462,10 @@ Google Sheets OAuth (credential setup, consent screen, token refresh, secure sto
 **Sessions:** 3-4 total
 **Start command:** `/session-start`
 
-### 7.1 Budget Estimation
-- [ ] `estimateCost()` aggregated across all configured adapters before execution
-- [ ] CLI displays: "Estimated cost: ~$X (Exa: $Y, Hunter: $Z, AI: $W). Proceed? [y/n]"
-- [ ] Actual cost tracked in `run-meta.json` and compared to estimate after run
+### 7.1 Budget Estimation ✅ (2026-04-06)
+- [x] `estimateCost()` aggregated across all configured adapters before execution
+- [x] CLI displays: "Estimated cost: ~$X (Exa: $Y, Hunter: $Z, AI: $W). Proceed? [y/n]"
+- [x] Actual cost tracked in `run-meta.json` and compared to estimate after run
 
 ### 7.2 Post-Discovery Expansion (`find_similar`)
 **Note:** The design spec (Section 4.3) treats this as part of core discovery. It is intentionally deferred from the core pipeline to Phase 7 because P0 similarity (from success profile seeds, built in Phase 3) covers the highest-value use case. Post-discovery expansion is opt-in enhancement, not essential for V1 success criteria.
@@ -474,17 +474,18 @@ Google Sheets OAuth (credential setup, consent screen, token refresh, secure sto
 - [ ] New candidates flow through enrichment → scoring → output
 - [ ] Cost estimate includes expansion
 
-### 7.3 Non-Interactive Mode
-- [ ] `--yes` flag bypasses all confirmations
-- [ ] `--no-interactive` uses config file for all inputs (no prompts)
-- [ ] `sourcerer run --config ./config.yaml --output json,notion --yes`
-- [ ] Enables scripting and scheduled re-runs
+### 7.3 Non-Interactive Mode ✅ (2026-04-06)
+- [x] `--yes` flag bypasses all confirmations
+- [x] `--no-interactive` uses config file for all inputs (no prompts)
+- [x] `sourcerer run --config ./config.yaml --output json,notion --yes`
+- [x] `--quiet` flag for minimal output (scripting)
+- [x] Enables scripting and scheduled re-runs
 
-### 7.4 Run Management
-- [ ] `sourcerer runs` — list all previous runs with date, role, candidate count, tier breakdown
-- [ ] `sourcerer runs clean --older-than 30d` — remove old run artifacts
-- [ ] `sourcerer candidates delete <id>` — delete candidate locally + warn about remote copies
-- [ ] `sourcerer candidates purge --expired` — remove PII-expired candidates
+### 7.4 Run Management ✅ (2026-04-06)
+- [x] `sourcerer runs` — list all previous runs with date, role, candidate count, cost, duration
+- [x] `sourcerer runs clean --older-than 30d` — remove old run artifacts with confirmation
+- [x] `sourcerer candidates delete <id>` — delete candidate locally + warn about remote copies
+- [x] `sourcerer candidates purge --expired` — redact PII on expired candidates
 
 ### 7.5 Premium Adapters (Parallel — each independent)
 - [ ] `adapter-pearch` — 810M+ structured profiles, credit-based
