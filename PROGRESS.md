@@ -2,6 +2,31 @@
 
 ---
 
+## Session: 2026-04-06 09:25 — Phase 6 Output Adapters + Issue #3
+
+### Completed
+- **Phase 6A: output-csv** — `@sourcerer/output-csv` package with `CsvOutputAdapter`, `csv-stringify` RFC 4180 rendering, UTF-8 BOM, field extractors (role/company from rawProfile, email from PII/identifiers, top signals, LinkedIn/GitHub URLs). 29 tests.
+- **Phase 6B: output-notion** — `@sourcerer/output-notion` package with `NotionOutputAdapter`, find-or-create database, page-per-candidate (narrative callout, score table, evidence bullets, red flags, profile links), upsert by CandidateId, token bucket rate limiter (3 req/sec + exponential backoff). 27 tests.
+- **Phase 6D: CLI results display** — `sourcerer results` command with `--tier` filtering, `--push` re-export, `--run` directory selection, `--json` scripting output. Run loader, candidate card formatter, summary table, shared adapter registry. 14 new tests.
+- **Integration:** CLI package.json/tsconfig updated with new packages, `run.ts` refactored to use shared `adapter-registry.ts`, `results` removed from stubs.
+- **Issue #3 (closed):** Low-confidence identity merges now auto-merge with `lowConfidenceMerge` flag on `PersonIdentity`. `mergeConfidence` is now meaningful (1.0 single / 0.95 high-medium / 0.7 low). Flag surfaced in all 5 output formats.
+- **Code review fixes:** Notion rate-limit retry loop (max 2), DB search scoped to parent page, GitHub username → URL in page builder, `findLatestRunDir` filters to directories, Notion credential error messaging, CLI tsconfig adapter references added.
+
+### Test Results
+- 570 tests passing, 0 failing across 13 packages (baseline was ~306 at start)
+
+### Issues Encountered
+- Worktree agents didn't auto-commit — copied files manually from worktree paths
+- Vercel plugin hooks fired false positives throughout (not a Next.js project)
+
+### Next Session Should
+- **Phase 7:** Polish & advanced features — output-sheets (deferred from Phase 6), post-discovery expansion, premium adapters
+- Update `docs/roadmap.md` to check off Phase 6 items
+- Live smoke test with real API keys (still pending from Phase 5)
+- Issue #1 (LinkedIn/Pearch) and #4 (Google Sheets OAuth) remain deferred
+
+---
+
 ## Session: 2026-03-30 08:15 — Local Overnight Agent Setup
 
 ### Completed

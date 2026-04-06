@@ -83,4 +83,4 @@ pnpm clean            # Remove all dist/ and tsbuildinfo
 
 Turbo builds in topological order: `core` → 6 packages in parallel → `cli`.
 
-See `docs/roadmap.md` for full phased plan. Currently: Phases 1-5 COMPLETE. Next: Phase 6 (Output Adapters — CSV, Notion, CLI results display).
+See `docs/roadmap.md` for full phased plan. Currently: Phases 1-6 COMPLETE. Next: Phase 7 (Polish & Advanced — output-sheets, post-discovery expansion, premium adapters).

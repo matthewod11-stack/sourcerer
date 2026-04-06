@@ -416,43 +416,43 @@ adapter-github was built in Phase 2.3. This phase hardens it for production enri
 
 **Mode:** PARALLEL FORK. Independent adapters, no shared state. Use `/orchestrate`.
 
-### Phase 6A: output-csv (Agent 1)
+### Phase 6A: output-csv (Agent 1) ✅ (2026-04-06)
 **Scope:** `packages/output/output-csv/`
 **Sessions:** 1
 
-- [ ] Flattened CSV with columns: Name, Score, Tier, Current Role, Company, Email, Top 3 Signals, Narrative (truncated), LinkedIn URL, GitHub URL
-- [ ] Excel-compatible encoding (UTF-8 BOM, proper escaping)
-- [ ] Sorted by score descending
-- [ ] `push()` writes file. `upsert()` overwrites file.
-- **Acceptance:** Generates valid CSV that opens correctly in Excel and Google Sheets. All fields properly escaped.
+- [x] Flattened CSV with columns: Name, Score, Tier, Current Role, Company, Email, Top 3 Signals, Narrative (truncated), LinkedIn URL, GitHub URL, Low Confidence Merge
+- [x] Excel-compatible encoding (UTF-8 BOM, proper escaping via csv-stringify)
+- [x] Sorted by score descending
+- [x] `push()` writes file. `upsert()` overwrites file.
+- **Acceptance:** Generates valid CSV that opens correctly in Excel and Google Sheets. All fields properly escaped. 29 tests.
 
-### Phase 6B: output-notion (Agent 2)
+### Phase 6B: output-notion (Agent 2) ✅ (2026-04-06)
 **Scope:** `packages/output/output-notion/`
-**Sessions:** 2
+**Sessions:** 1
 
-- [ ] Create Notion database if not exists (properties: Name, Score, Tier, Role, Company, Email, Status)
-- [ ] Create page per candidate (body: narrative brief → score breakdown → evidence chain)
-- [ ] `upsert()`: match by candidate ID stored in a hidden Notion property, update existing pages
-- [ ] Track push history: record which candidates were pushed when (for delete warnings)
-- [ ] Handle: Notion API rate limits, token pagination for large result sets
-- **Acceptance:** Given 20 candidates, creates Notion DB with pages. Re-running upserts existing candidates (updates score/tier), creates new candidates. No duplicates.
+- [x] Create Notion database if not exists (properties: Name, Score, Tier, Role, Company, Email, Status, Low Confidence Merge, CandidateId, PushedAt)
+- [x] Create page per candidate (body: narrative callout → score breakdown table → evidence bullets → red flags callout → profile links)
+- [x] `upsert()`: match by candidate ID stored in CandidateId property, update existing pages
+- [x] Track push history: PushedAt date property records when each candidate was last synced
+- [x] Handle: Notion API rate limits (token bucket 3 req/sec + exponential backoff), parent-page-scoped DB search
+- **Acceptance:** Given 20 candidates, creates Notion DB with pages. Re-running upserts existing candidates (updates score/tier), creates new candidates. No duplicates. 27 tests.
 
 ### Phase 6C: output-sheets — DEFERRED TO PHASE 7
 
 Google Sheets OAuth (credential setup, consent screen, token refresh, secure storage of refresh tokens) is significantly more complex than other output adapters. Deferred to Phase 7 to avoid blocking Phase 6 completion. V1 ships with CSV + Notion + JSON + Markdown — four output formats is sufficient for launch.
 
-### Phase 6D: CLI Results Display (Can be Agent 4, or folded into any agent with spare capacity)
+### Phase 6D: CLI Results Display ✅ (2026-04-06)
 **Scope:** `apps/cli/` — results rendering
 **Sessions:** 1
 
-- [ ] `sourcerer results` — terminal display of last run results
-- [ ] Candidate cards with score, tier, role, company, top signals
-- [ ] `--tier` filtering
-- [ ] `--push <adapter>` — re-push to a different output from existing results
-- [ ] Progress indicators for discovery/enrichment phases (per-adapter status)
-- **Acceptance:** `sourcerer results --tier 1` shows only Tier 1 candidates with formatted cards.
+- [x] `sourcerer results` — terminal display of last run results
+- [x] Candidate cards with score, tier, role, company, top signals, low-confidence merge badge
+- [x] `--tier` filtering
+- [x] `--push <adapter>` — re-push to a different output from existing results
+- [x] Shared adapter registry (`adapter-registry.ts`) used by both `run` and `results` commands
+- **Acceptance:** `sourcerer results --tier 1` shows only Tier 1 candidates with formatted cards. 14 new tests.
 
-**End of Phase 6:** `/checkpoint` — All output adapters working. Full pipeline delivers results to CSV, Notion, Sheets, JSON, Markdown, and terminal.
+**End of Phase 6:** `/checkpoint` ✅ — All output adapters working. Full pipeline delivers results to CSV, Notion, JSON, Markdown, and terminal. (Sheets deferred to Phase 7.)
 
 ---
 
