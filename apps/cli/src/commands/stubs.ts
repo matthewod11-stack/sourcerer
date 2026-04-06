@@ -4,8 +4,6 @@ const STUB_COMMANDS = [
   'discover',
   'enrich',
   'score',
-  'runs',
-  'candidates',
 ] as const;
 
 export type StubCommand = (typeof STUB_COMMANDS)[number];

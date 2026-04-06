@@ -175,6 +175,7 @@ export interface RunMeta {
   phases: PhaseTimingEntry[];
   lastCompletedPhase?: PipelinePhaseName;
   cost: CostSnapshot;
+  estimatedCost?: number;
   candidateCount?: number;
   version: 1;
 }

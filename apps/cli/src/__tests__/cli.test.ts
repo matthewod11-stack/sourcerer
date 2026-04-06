@@ -128,7 +128,7 @@ describe('Help command', () => {
 
 describe('Stub commands', () => {
   it('isStubCommand recognizes valid commands', () => {
-    expect(isStubCommand('candidates')).toBe(true);
+    expect(isStubCommand('discover')).toBe(true);
   });
 
   it('isStubCommand rejects unknown commands', () => {

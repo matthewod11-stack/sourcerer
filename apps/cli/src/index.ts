@@ -75,6 +75,20 @@ async function main(): Promise<void> {
     return;
   }
 
+  // Runs command
+  if (command === 'runs') {
+    const { runsCommand } = await import('./commands/runs.js');
+    await runsCommand(args.slice(1));
+    return;
+  }
+
+  // Candidates command
+  if (command === 'candidates') {
+    const { candidatesCommand } = await import('./commands/candidates.js');
+    await candidatesCommand(args.slice(1));
+    return;
+  }
+
   // Stub commands
   if (isStubCommand(command)) {
     runStub(command);

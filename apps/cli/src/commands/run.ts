@@ -25,18 +25,27 @@ import {
   createScoreHandler,
   createOutputHandler,
 } from '../handlers.js';
+import { estimateBudget, confirmBudget } from '../budget-estimator.js';
 
-function parseArgs(args: string[]): {
+export interface ParsedRunArgs {
   configPath?: string;
   outputFormats: string[];
   resumeFrom?: string;
   useIntake: boolean;
   noCache: boolean;
-} {
+  yes: boolean;
+  noInteractive: boolean;
+  quiet: boolean;
+}
+
+export function parseArgs(args: string[]): ParsedRunArgs {
   let configPath: string | undefined;
   let resumeFrom: string | undefined;
   let useIntake = false;
   let noCache = false;
+  let yes = false;
+  let noInteractive = false;
+  let quiet = false;
   const outputFormats: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -50,13 +59,19 @@ function parseArgs(args: string[]): {
       useIntake = true;
     } else if (args[i] === '--no-cache') {
       noCache = true;
+    } else if (args[i] === '--yes' || args[i] === '-y') {
+      yes = true;
+    } else if (args[i] === '--no-interactive') {
+      noInteractive = true;
+    } else if (args[i] === '--quiet' || args[i] === '-q') {
+      quiet = true;
     } else if (args[i] === '--help' || args[i] === '-h') {
       printUsage();
-      return { outputFormats: [], useIntake: false, noCache: false };
+      return { outputFormats: [], useIntake: false, noCache: false, yes: false, noInteractive: false, quiet: false };
     }
   }
 
-  return { configPath, outputFormats, resumeFrom, useIntake, noCache };
+  return { configPath, outputFormats, resumeFrom, useIntake, noCache, yes, noInteractive, quiet };
 }
 
 function printUsage(): void {
@@ -67,10 +82,29 @@ function printUsage(): void {
   console.log('  --output <formats>  Output formats, comma-separated (default: json)');
   console.log('  --resume <dir>      Resume from a previous run directory');
   console.log('  --intake            Run interactive intake before pipeline');
+  console.log('  --no-cache          Disable AI response caching');
+  console.log('  --yes, -y           Skip budget confirmation prompt');
+  console.log('  --no-interactive    Non-interactive mode (implies --yes)');
+  console.log('  --quiet, -q         Suppress progress output');
 }
 
 export async function runCommand(args: string[]): Promise<void> {
   const parsed = parseArgs(args);
+
+  // --no-interactive implies --yes
+  if (parsed.noInteractive) parsed.yes = true;
+
+  if (parsed.noInteractive && parsed.useIntake && !parsed.configPath) {
+    console.error(chalk.red('--no-interactive with --intake requires --config <path>'));
+    process.exitCode = 1;
+    return;
+  }
+
+  if (parsed.noInteractive && !parsed.configPath && !parsed.resumeFrom) {
+    console.error(chalk.red('--no-interactive requires --config <path> or --resume <dir>'));
+    process.exitCode = 1;
+    return;
+  }
 
   if (!parsed.configPath && !parsed.resumeFrom && !parsed.useIntake) {
     printUsage();
@@ -169,6 +203,18 @@ export async function runCommand(args: string[]): Promise<void> {
   const hunterApiKey = getAdapterApiKey(sourcererConfig, 'hunter');
   const hunter = hunterApiKey ? new HunterAdapter(hunterApiKey) : undefined;
 
+  // Budget estimation
+  const estimate = estimateBudget(
+    { exa, github, x, hunter },
+    searchConfig!,
+    searchConfig?.maxCandidates,
+  );
+  const proceed = await confirmBudget(estimate, parsed.yes);
+  if (!proceed) {
+    console.log('Aborted.');
+    return;
+  }
+
   // Determine output formats
   const formats =
     parsed.outputFormats.length > 0
@@ -210,7 +256,7 @@ export async function runCommand(args: string[]): Promise<void> {
     talentProfile,
     resumeFrom: parsed.resumeFrom,
     maxCostUsd: searchConfig?.maxCostUsd,
-    onProgress: (event) => {
+    onProgress: parsed.quiet ? undefined : (event) => {
       const icon =
         event.status === 'completed'
           ? chalk.green('done')
@@ -229,6 +275,7 @@ export async function runCommand(args: string[]): Promise<void> {
   console.log(`  Status: ${meta.status}`);
   console.log(`  Candidates: ${meta.candidateCount ?? 0}`);
   console.log(`  Cost: $${meta.cost.totalCost.toFixed(4)}`);
+  console.log(`  Estimated: $${estimate.total.toFixed(4)}, Actual: $${meta.cost.totalCost.toFixed(4)}`);
   console.log(`  Duration: ${meta.totalDurationMs ?? 0}ms`);
   console.log(`  Run dir: ${meta.runDir}`);
 }
