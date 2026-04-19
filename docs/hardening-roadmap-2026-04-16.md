@@ -16,7 +16,7 @@ Every item has: **Problem**, **Fix**, **Files**, **Acceptance**, **Effort** (S =
 The root [`ROADMAP.md`](../ROADMAP.md) is the authoritative ordering. The checklist below mirrors it for quick reference inside this doc.
 
 ### Phase 1 — Security & Privacy (parallel-safe)
-- [x] **H-1** Sandbox external content in LLM prompts (M) ✅ 2026-04-16
+- [x] **H-1** Sandbox external content in LLM prompts (M) ✅ 2026-04-19
 - [ ] **H-2** Populate `retentionExpiresAt` at PII collection time (M)
 - [ ] **H-3** Stop logging raw PII to stdout (S)
 

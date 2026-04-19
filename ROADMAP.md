@@ -13,7 +13,7 @@ This file is the single source of truth for `/session-start` task selection. Pha
 Full item specs (Problem, Fix, Files, Acceptance, Effort) live in [`docs/hardening-roadmap-2026-04-16.md`](docs/hardening-roadmap-2026-04-16.md). GitHub Issues are filed per item for tracking and overnight-agent eligibility.
 
 ### Phase 1 — Security & Privacy (parallel-safe)
-- [x] [**H-1** #5](https://github.com/matthewod11-stack/sourcerer/issues/5) Sandbox external content in LLM prompts — M — no deps ✅ 2026-04-16
+- [x] [**H-1** #5](https://github.com/matthewod11-stack/sourcerer/issues/5) Sandbox external content in LLM prompts — M — no deps ✅ 2026-04-19
 - [ ] [**H-2** #6](https://github.com/matthewod11-stack/sourcerer/issues/6) Populate `retentionExpiresAt` at PII collection time — M — no deps
 - [ ] [**H-3** #7](https://github.com/matthewod11-stack/sourcerer/issues/7) Stop logging raw PII to stdout — S — no deps
 
