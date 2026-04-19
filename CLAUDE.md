@@ -52,6 +52,7 @@ sourcerer/
 | What happened last session? | [`PROGRESS.md`](PROGRESS.md) |
 | What's being tracked for the overnight agent? | `gh issue list --label tech-debt` |
 | How does the overnight agent work? | [`docs/OVERNIGHT_AGENT.md`](docs/OVERNIGHT_AGENT.md) |
+| Setting up a new machine? | [`Machine Setup`](#machine-setup) section below |
 
 ## Key Commands
 
@@ -64,6 +65,43 @@ pnpm dev              # Dev mode (turbo)
 pnpm typecheck        # Type-check all packages
 pnpm clean            # Remove all dist/ and tsbuildinfo
 ```
+
+## Machine Setup
+
+Most of what you need lands with `git clone` + `pnpm install`. A few things are intentionally per-machine and need to be provisioned manually — keys live outside the repo by design, and per-machine state would only confuse a sync.
+
+### What `git clone` gives you
+All source, tests, prompts, docs, the overnight agent prompt, and the hardening roadmap. After `pnpm install && pnpm build && pnpm test` you have a working, tested codebase.
+
+### What's per-machine (gitignored)
+
+| Path | Purpose | Provisioning |
+|---|---|---|
+| `~/.sourcerer/config.yaml` | API keys (Anthropic, Exa, GitHub, Hunter, Notion) | **Copy from another machine** (`scp`/`rsync`), or run `pnpm --filter @sourcerer/cli start init` and paste keys interactively |
+| `.env` / `.env.local` | Optional shell-env overrides for development | Copy if you have a working setup; otherwise unneeded |
+| `runs/` (repo root) | Cached candidate data from past sourcing runs (contains PII) | **Don't sync.** Recreate per machine — running another sourcing pass is cheaper than transferring PII across machines |
+| `state/` (repo root) | Overnight-agent run log + other runtime state | Auto-created on first overnight-agent run; don't sync |
+| `PROGRESS.md` | Per-machine session history written by `/session-start` and `/session-end` | **Don't sync.** Each machine keeps its own — divergent histories will confuse you |
+| `AGENTS.md`, `PROJECT_STATE.md`, `prompts/`, `DESIGN-sourcerer-strategy-*.md`, `PROGRESS_ARCHIVE.md` | Personal/workflow files kept out of the public OSS repo | Copy if you have them on another machine; otherwise the project still runs without them |
+
+### Fastest provisioning path on a new machine
+
+```bash
+# 1. Code
+git clone https://github.com/matthewod11-stack/sourcerer.git
+cd sourcerer && pnpm install && pnpm build && pnpm test
+
+# 2. API keys — choose ONE
+scp homemachine:~/.sourcerer/config.yaml ~/.sourcerer/config.yaml      # if you have another machine
+# OR
+pnpm --filter @sourcerer/cli start init                                 # interactive prompts
+
+# 3. (Optional) Smoke-test Anthropic creds with the H-1 adversarial eval
+node apps/cli/scripts/h1-adversarial-eval.mjs
+```
+
+### Public repo hygiene
+This repo is open source. The gitignore is curated to keep secrets, PII, internal planning, and personal workflow scaffolding out of public history. **Before adding a new file at the repo root, check whether it should be added to `.gitignore` first** — the cost of leaking once is much higher than the cost of an extra `gitignore` line.
 
 ## Key Files
 
