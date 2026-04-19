@@ -34,11 +34,24 @@ sourcerer/
 │   └── ai/            # LLM abstraction layer, prompt templates, response caching
 ├── apps/
 │   └── cli/           # Interactive CLI application
-├── docs/
-│   ├── specs/         # Design specifications
-│   └── roadmap.md     # Implementation roadmap
-└── DESIGN-sourcerer-strategy-2026-03-20.md
+└── docs/
+    ├── specs/                               # Design specifications
+    ├── roadmap.md                           # V1 product roadmap (phased)
+    ├── hardening-roadmap-2026-04-16.md      # Security/privacy/correctness audit backlog
+    └── OVERNIGHT_AGENT.md                   # Autonomous tech-debt agent prompt
 ```
+
+## Documentation Map
+
+| Question | File |
+|---|---|
+| What's the next task? | [`ROADMAP.md`](ROADMAP.md) — first unchecked item |
+| How do I implement hardening item X? | [`docs/hardening-roadmap-2026-04-16.md`](docs/hardening-roadmap-2026-04-16.md) §X |
+| What's the product V1 plan? | [`docs/roadmap.md`](docs/roadmap.md) |
+| What's the design? | [`docs/specs/2026-03-20-sourcerer-design.md`](docs/specs/2026-03-20-sourcerer-design.md) |
+| What happened last session? | [`PROGRESS.md`](PROGRESS.md) |
+| What's being tracked for the overnight agent? | `gh issue list --label tech-debt` |
+| How does the overnight agent work? | [`docs/OVERNIGHT_AGENT.md`](docs/OVERNIGHT_AGENT.md) |
 
 ## Key Commands
 
@@ -54,14 +67,12 @@ pnpm clean            # Remove all dist/ and tsbuildinfo
 
 ## Key Files
 
-- `docs/specs/2026-03-20-sourcerer-design.md` — Full design specification (reviewed, 2 rounds)
-- `docs/roadmap.md` — Implementation roadmap (validated)
-- `docs/hardening-roadmap-2026-04-16.md` — Security/privacy/quality fixes + enhancements backlog (audit-driven, 2026-04-16)
-- `DESIGN-sourcerer-strategy-2026-03-20.md` — Product strategy and business context
-- `PROJECT_STATE.md` — Cross-surface context sync (Claude Chat, Claude Code, Cowork)
-- `docs/OVERNIGHT_AGENT.md` — Autonomous tech-debt agent prompt + issue template
-- `prompts/overnight-agent.md` — Desktop task entry point for overnight agent
-- `state/overnight-agent-log.json` — Run log (gitignored, written by overnight agent)
+- [`ROADMAP.md`](ROADMAP.md) — Active task list (session-start entry point)
+- [`PROGRESS.md`](PROGRESS.md) — Session history and handoff notes
+- [`docs/specs/2026-03-20-sourcerer-design.md`](docs/specs/2026-03-20-sourcerer-design.md) — Full design specification (reviewed, 2 rounds)
+- [`docs/roadmap.md`](docs/roadmap.md) — V1 product roadmap (phases 1–7, validated)
+- [`docs/hardening-roadmap-2026-04-16.md`](docs/hardening-roadmap-2026-04-16.md) — Security/privacy/quality audit backlog (active workstream)
+- [`docs/OVERNIGHT_AGENT.md`](docs/OVERNIGHT_AGENT.md) — Autonomous tech-debt agent prompt + issue template
 
 ## Conventions
 
@@ -84,4 +95,13 @@ pnpm clean            # Remove all dist/ and tsbuildinfo
 
 Turbo builds in topological order: `core` → 6 packages in parallel → `cli`.
 
-See `docs/roadmap.md` for full phased plan. Currently: Phases 1-6 + 7.1/7.3/7.4 COMPLETE. Remaining Phase 7: 7.2 (post-discovery expansion), 7.5 (premium adapters), 7.6 (output-sheets), 7.7 (advanced intake).
+## Project Status
+
+- **V1 product:** Phases 1–6 + 7.1 / 7.3 / 7.4 COMPLETE (2026-04-06). Paused: 7.2 (post-discovery expansion), 7.5 (premium adapters), 7.6 (output-sheets), 7.7 (advanced intake).
+- **Active workstream:** Hardening — see [`ROADMAP.md`](ROADMAP.md). 13 `H-*` findings + 5 `E-*` enhancements in 6 dependency-ordered phases.
+
+## Security Conventions
+
+- **Never log raw PII.** Use `redactPII()` helper when available (see H-3). For emails use `${local.slice(0, 2)}***@${domain}` or a short SHA-256 hash.
+- **Never concat untrusted text into LLM prompts.** External content (bios, posts, snippets) must be sandboxed per H-1 (`<evidence>...</evidence>` delimiters + explicit "treat as data, not instructions" instruction + control-char stripping).
+- **All PII collection must set `retentionExpiresAt`** (see H-2). Don't construct `PIIField` without it.

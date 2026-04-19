@@ -7,6 +7,7 @@ import type {
   ExtractedSignals,
   EvidenceItem,
 } from '@sourcerer/core';
+import { sanitizeUntrustedText } from '@sourcerer/core';
 import { renderTemplate } from '@sourcerer/ai';
 import { ExtractedSignalsSchema } from './schemas.js';
 import { validateGrounding, type GroundingResult } from './grounding-validator.js';
@@ -25,33 +26,65 @@ export interface SignalExtractionResult {
 
 /**
  * Format evidence items into a readable string for the LLM prompt.
- * Each item: [ev-XXXXXX] (adapter, confidence): claim
+ *
+ * Each claim is sandboxed: the text comes from untrusted sources (GitHub bios,
+ * X posts, Exa snippets) and could attempt prompt injection. We wrap each item
+ * in `<evidence>` delimiters and sanitize the payload (strip control chars,
+ * defang angle brackets, truncate). The accompanying prompt tells the model to
+ * treat tag contents as data, not instructions. See sanitize.ts and §H-1.
  */
 export function formatEvidence(evidence: EvidenceItem[]): string {
   if (evidence.length === 0) return '(no evidence available)';
   return evidence
-    .map((e) => `[${e.id}] (${e.adapter}, ${e.confidence}): ${e.claim}`)
+    .map((e) => {
+      const safeClaim = sanitizeUntrustedText(e.claim);
+      return `<evidence id="${e.id}" adapter="${e.adapter}" confidence="${e.confidence}">${safeClaim}</evidence>`;
+    })
     .join('\n');
 }
 
 /**
+ * Sanitize every string field of an arbitrary value, recursively.
+ * Used to defang user-supplied talent-profile fields before they're serialized
+ * into the prompt. Non-string leaves (numbers, booleans, dates) pass through.
+ */
+function sanitizeDeep<T>(value: T): T {
+  if (typeof value === 'string') {
+    return sanitizeUntrustedText(value) as unknown as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((v) => sanitizeDeep(v)) as unknown as T;
+  }
+  if (value !== null && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      out[k] = sanitizeDeep(v);
+    }
+    return out as T;
+  }
+  return value;
+}
+
+/**
  * Format the talent profile into a readable string for the LLM prompt.
+ *
+ * Talent-profile text comes from user-typed role/company descriptions and
+ * adapter-discovered company intel — both outside the trust boundary. Every
+ * string field is sanitized before serialization, and the result is wrapped in
+ * `<profile>` delimiters so the prompt can address it explicitly.
  */
 export function formatTalentProfile(profile: TalentProfile): string {
-  return JSON.stringify(
-    {
-      role: profile.role,
-      company: {
-        name: profile.company.name,
-        techStack: profile.company.techStack,
-        cultureSignals: profile.company.cultureSignals,
-      },
-      successPatterns: profile.successPatterns,
-      antiPatterns: profile.antiPatterns,
+  const safe = sanitizeDeep({
+    role: profile.role,
+    company: {
+      name: profile.company.name,
+      techStack: profile.company.techStack,
+      cultureSignals: profile.company.cultureSignals,
     },
-    null,
-    2,
-  );
+    successPatterns: profile.successPatterns,
+    antiPatterns: profile.antiPatterns,
+  });
+  return `<profile>\n${JSON.stringify(safe, null, 2)}\n</profile>`;
 }
 
 /**

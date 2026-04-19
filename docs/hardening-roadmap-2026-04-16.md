@@ -2,12 +2,50 @@
 
 > **Created:** 2026-04-16
 > **Source:** Mini audit run on Opus 4.7 (1M context) against the post-Phase-7.4 codebase
-> **Status:** Proposed — not yet scheduled
+> **Status:** Active — Phase 1 next
 > **Scope:** Security, privacy, correctness, and high-leverage enhancements that are *not* in `docs/roadmap.md`
 
 This document captures findings from a full-repo audit and converts each into a discrete, actionable work item. It is designed to be picked up in any order (respecting the dependency graph at the bottom) and referenced over multiple sessions.
 
 Every item has: **Problem**, **Fix**, **Files**, **Acceptance**, **Effort** (S = <2 h, M = half-day, L = multi-day), and **Depends on**.
+
+---
+
+## Execution Tracker
+
+The root [`ROADMAP.md`](../ROADMAP.md) is the authoritative ordering. The checklist below mirrors it for quick reference inside this doc.
+
+### Phase 1 — Security & Privacy (parallel-safe)
+- [x] **H-1** Sandbox external content in LLM prompts (M) ✅ 2026-04-16
+- [ ] **H-2** Populate `retentionExpiresAt` at PII collection time (M)
+- [ ] **H-3** Stop logging raw PII to stdout (S)
+
+### Phase 2 — Model defaults, Zod config, determinism (parallel-safe)
+- [ ] **H-4** Upgrade Anthropic default model (S)
+- [ ] **H-5** Replace hand-rolled config validator with Zod (S)
+- [ ] **H-10** Stable sort for GitHub repo selection (S)
+
+### Phase 3 — Boundaries, cost, grounding
+- [ ] **H-6** Zod-parse checkpoint and intake-context deserialization (S, needs H-5)
+- [ ] **H-11** Zod-parse external API responses (M, needs H-5)
+- [ ] **H-7** Real token-usage accounting (M)
+- [ ] **H-8** Fix malformed SearchConfig in budget gate (S)
+- [ ] **H-9** Penalize the score on hallucinated IDs — **needs policy decision** (S)
+
+### Phase 4 — Logging, prompt versioning, tests, docs
+- [ ] **E-2** Structured logging & run telemetry (M, pairs with H-3)
+- [ ] **E-4** Versioned prompt registry (S)
+- [ ] **H-12** Grow scoring-package test coverage (M, needs H-1 + H-9)
+- [ ] **H-13** Document plaintext-PII-at-rest posture (S)
+
+### Phase 5 — Replay & eval
+- [ ] **E-3** Cache-driven replay mode (S–M, needs E-4)
+- [ ] **E-1** Golden-set evaluation harness (L, needs E-2)
+
+### Phase 6 — Batch-scoring spike
+- [ ] **E-5** Opus-4.7 / 1M-context batch scoring spike (M + L, needs E-1)
+
+**Minimum-viable hardening pass** (per the audit): Phase 1 + H-5 + H-7 — closes every High-severity finding and the most important Medium. ~2–3 sessions.
 
 ---
 

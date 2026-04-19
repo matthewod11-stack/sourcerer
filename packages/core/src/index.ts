@@ -147,3 +147,11 @@ export type {
   CompetitorMap,
   TalentProfile,
 } from './intake.js';
+
+// Sanitization (untrusted text crossing into prompts/logs)
+export type { SanitizeOptions } from './sanitize.js';
+export {
+  sanitizeUntrustedText,
+  DEFAULT_MAX_LENGTH,
+  TRUNCATION_MARKER,
+} from './sanitize.js';
