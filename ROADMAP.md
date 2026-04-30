@@ -27,7 +27,7 @@ Full item specs (Problem, Fix, Files, Acceptance, Effort) live in [`docs/hardeni
 - [ ] [**H-11** #12](https://github.com/matthewod11-stack/sourcerer/issues/12) Zod-parse external API responses — M — needs #9
 - [x] [**H-7** #13](https://github.com/matthewod11-stack/sourcerer/issues/13) Real token-usage accounting — M — no deps (pairs with E-2) ✅ 2026-04-30
 - [ ] [**H-8** #14](https://github.com/matthewod11-stack/sourcerer/issues/14) Fix malformed SearchConfig in budget gate — S — no deps
-- [ ] [**H-9** #15](https://github.com/matthewod11-stack/sourcerer/issues/15) Penalize the score on hallucinated IDs — S — **needs-design-decision** (strict / soft / bifurcated)
+- [x] [**H-9** #15](https://github.com/matthewod11-stack/sourcerer/issues/15) Penalize the score on hallucinated IDs — S — design-decision: soft proportional + 0.15 floor, surfaced to user, no cap ✅ 2026-04-30
 
 ### Phase 1 follow-up
 - [x] [**H-1 follow-up** #18](https://github.com/matthewod11-stack/sourcerer/issues/18) Run behavioral adversarial eval with real LLM — narrative paraphrase directive — ✅ 2026-04-30 (5/5 defended)
