@@ -24,7 +24,7 @@ describe('generateCacheKey', () => {
 
   it('differs for different models', () => {
     const key1 = generateCacheKey('hello', 'gpt-4o');
-    const key2 = generateCacheKey('hello', 'claude-sonnet-4-20250514');
+    const key2 = generateCacheKey('hello', 'claude-sonnet-4-6');
     expect(key1).not.toBe(key2);
   });
 

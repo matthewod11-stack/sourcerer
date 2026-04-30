@@ -117,6 +117,18 @@ pnpm --filter @sourcerer/cli start results --tier 1
 
 Keys are stored in `~/.sourcerer/config.yaml` (outside the repo, never committed).
 
+### Model Selection
+
+Sourcerer uses Anthropic Sonnet 4.6 (`claude-sonnet-4-6`) by default for per-candidate scoring — fast, cheap, and high-quality enough for the structured-output workload. Override per-run by setting `aiProvider.model` in `~/.sourcerer/config.yaml`. The current defaults are visible at any time via `sourcerer config status`.
+
+| Model | When to pick it |
+|---|---|
+| `claude-opus-4-7` | Deep narrative reasoning, batch scoring with 1M-context (post-Phase-4 enhancement E-5) |
+| `claude-sonnet-4-6` | **Default.** Per-candidate scoring, intake conversation, content research |
+| `claude-haiku-4-5` | Bulk preprocessing, dedup-time identity scoring, very high-volume runs |
+
+OpenAI provider also supported (`aiProvider.name: openai`); current default is `gpt-4o`.
+
 ## Development
 
 ```bash

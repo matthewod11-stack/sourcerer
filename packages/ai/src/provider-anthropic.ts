@@ -11,8 +11,8 @@ import type {
 import type { ResponseCache } from './response-cache.js';
 import { generateCacheKey } from './response-cache.js';
 
-/** Default model for the Anthropic provider */
-const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
+/** Default model for the Anthropic provider — Sonnet 4.6 (H-4) */
+export const DEFAULT_MODEL = 'claude-sonnet-4-6';
 
 /** Maximum retries for structured output parse/validation failures */
 const MAX_STRUCTURED_RETRIES = 2;

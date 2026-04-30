@@ -12,7 +12,7 @@ import type { ResponseCache } from './response-cache.js';
 import { generateCacheKey } from './response-cache.js';
 
 /** Default model for the OpenAI provider */
-const DEFAULT_MODEL = 'gpt-4o';
+export const DEFAULT_MODEL = 'gpt-4o';
 
 /** Maximum retries for structured output parse/validation failures */
 const MAX_STRUCTURED_RETRIES = 2;

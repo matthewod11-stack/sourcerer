@@ -7,6 +7,7 @@ import {
   getConfiguredAdapters,
   type SourcererConfig,
 } from '@sourcerer/core';
+import { getDefaultModel } from '@sourcerer/ai';
 import { configFileExists, loadConfigFromDisk } from '../config-io.js';
 
 const CHECK = chalk.green('✓');
@@ -45,8 +46,11 @@ function formatStatus(config: SourcererConfig): string {
 
   // AI Provider
   lines.push(chalk.bold('AI Provider:'));
-  const model = config.aiProvider.model ?? 'default';
-  lines.push(`  ${CHECK} ${config.aiProvider.name.padEnd(14)} ${chalk.green(`configured (${model})`)}`);
+  const effectiveModel =
+    config.aiProvider.model ?? getDefaultModel(config.aiProvider.name);
+  lines.push(
+    `  ${CHECK} ${config.aiProvider.name.padEnd(14)} ${chalk.green(`configured (${effectiveModel})`)}`,
+  );
   lines.push('');
 
   // Defaults
