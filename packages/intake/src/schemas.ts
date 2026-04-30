@@ -110,3 +110,71 @@ export const ProfileAnalysisPartialSchema = z.object({
   seniorityLevel: z.string().optional(),
   cultureSignals: z.array(z.string()).default([]),
 });
+
+// --- IntakeContext (H-6: full deserialization validation) ---
+
+const ProfileInputTypeSchema = z.enum([
+  'github_url',
+  'linkedin_url',
+  'pasted_text',
+  'name_company',
+  'personal_url',
+]);
+
+const FullProfileAnalysisSchema = z.object({
+  inputType: ProfileInputTypeSchema,
+  name: z.string().optional(),
+  careerTrajectory: z.array(CareerStepSchema).default([]),
+  skillSignatures: z.array(z.string()).default([]),
+  seniorityLevel: z.string().optional(),
+  cultureSignals: z.array(z.string()).default([]),
+  urls: z.array(z.string()).default([]),
+  analyzedAt: z.string(),
+});
+
+const FullCompanyIntelSchema = z.object({
+  name: z.string(),
+  url: z.string(),
+  techStack: z.array(z.string()).default([]),
+  teamSize: z.string().optional(),
+  fundingStage: z.string().optional(),
+  productCategory: z.string().optional(),
+  cultureSignals: z.array(z.string()).default([]),
+  pitch: z.string().optional(),
+  competitors: z.array(z.string()).optional(),
+  analyzedAt: z.string(),
+});
+
+const TalentProfileSchema = z.object({
+  role: RoleParametersSchema,
+  company: FullCompanyIntelSchema,
+  successPatterns: CompositeProfileSchema,
+  antiPatterns: z.array(z.string()).default([]),
+  competitorMap: CompetitorMapSchema,
+  createdAt: z.string(),
+});
+
+const MessageSchema = z.object({
+  role: z.enum(['system', 'user', 'assistant']),
+  content: z.string(),
+});
+
+/**
+ * Validates an `IntakeContext` parsed from disk. H-6: replaces the prior
+ * `parsed as unknown as IntakeContext` cast in `deserializeContext`. Catches
+ * shape drift, missing arrays, or version-incompatible serializations at the
+ * boundary instead of at the first phase that touches the bad field.
+ */
+export const IntakeContextSchema = z.object({
+  roleDescription: z.string().optional(),
+  roleParameters: RoleParametersSchema.optional(),
+  companyUrl: z.string().optional(),
+  companyIntel: FullCompanyIntelSchema.optional(),
+  teamProfiles: z.array(FullProfileAnalysisSchema).optional(),
+  compositeProfile: CompositeProfileSchema.optional(),
+  antiPatterns: z.array(z.string()).optional(),
+  competitorMap: CompetitorMapSchema.optional(),
+  talentProfile: TalentProfileSchema.optional(),
+  similaritySeeds: z.array(z.string()).optional(),
+  conversationHistory: z.array(MessageSchema),
+});

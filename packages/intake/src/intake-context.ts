@@ -1,5 +1,6 @@
 // IntakeContext accumulator — builds up structured data across conversation phases
 
+import { z } from 'zod';
 import type {
   IntakeContext,
   CompanyIntel,
@@ -9,6 +10,7 @@ import type {
   TalentProfile,
   Message,
 } from '@sourcerer/core';
+import { IntakeContextSchema } from './schemas.js';
 
 /**
  * Creates a fresh, empty IntakeContext.
@@ -96,16 +98,31 @@ export function serializeContext(context: IntakeContext): string {
 }
 
 /**
- * Deserializes IntakeContext from JSON string.
- * Throws if the JSON is invalid or missing required fields.
+ * Deserializes IntakeContext from JSON string. H-6: parses the JSON shape
+ * with `IntakeContextSchema` so corrupt/drifted files surface a typed
+ * error at the boundary rather than crashing later inside a phase.
  */
 export function deserializeContext(json: string): IntakeContext {
-  const parsed = JSON.parse(json) as Record<string, unknown>;
-
-  // Validate required field
-  if (!Array.isArray(parsed.conversationHistory)) {
-    throw new Error('Invalid IntakeContext: missing conversationHistory array');
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch (err) {
+    throw new Error(
+      `Invalid IntakeContext JSON: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 
-  return parsed as unknown as IntakeContext;
+  const result = IntakeContextSchema.safeParse(parsed);
+  if (!result.success) {
+    throw new Error(formatIntakeContextErrors(result.error));
+  }
+  return result.data as IntakeContext;
+}
+
+function formatIntakeContextErrors(error: z.ZodError): string {
+  const issues = error.issues.map((issue) => {
+    const path = issue.path.length > 0 ? issue.path.join('.') : '<root>';
+    return `  ${path}: ${issue.message}`;
+  });
+  return `Invalid IntakeContext:\n${issues.join('\n')}`;
 }

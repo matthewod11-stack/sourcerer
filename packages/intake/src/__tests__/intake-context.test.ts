@@ -169,13 +169,33 @@ describe('IntakeContext', () => {
     });
 
     it('throws on invalid JSON', () => {
-      expect(() => deserializeContext('not json')).toThrow();
+      expect(() => deserializeContext('not json')).toThrow(/Invalid IntakeContext JSON/);
     });
 
-    it('throws when conversationHistory is missing', () => {
+    it('throws when conversationHistory is missing (H-6)', () => {
       expect(() => deserializeContext('{"roleDescription": "test"}')).toThrow(
-        'missing conversationHistory',
+        /conversationHistory/,
       );
+    });
+
+    it('reports nested path on shape drift (H-6)', () => {
+      // Message with non-string content fails inside conversationHistory[0]
+      const bad = JSON.stringify({
+        conversationHistory: [{ role: 'user', content: 42 }],
+      });
+      expect(() => deserializeContext(bad)).toThrow(/conversationHistory\.0\.content/);
+    });
+
+    it('rejects unknown role values in conversation history (H-6)', () => {
+      const bad = JSON.stringify({
+        conversationHistory: [{ role: 'admin', content: 'hi' }],
+      });
+      expect(() => deserializeContext(bad)).toThrow(/conversationHistory\.0\.role/);
+    });
+
+    it('rejects non-array conversationHistory (H-6)', () => {
+      const bad = JSON.stringify({ conversationHistory: 'not an array' });
+      expect(() => deserializeContext(bad)).toThrow(/conversationHistory/);
     });
   });
 });
