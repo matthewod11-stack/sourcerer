@@ -61,6 +61,32 @@ function truncateNarrative(narrative: string): string {
   return narrative.slice(0, MAX_NARRATIVE_LENGTH - 3) + '...';
 }
 
+/**
+ * H-9: render a one-line hallucination warning when any scoring dimension
+ * had its score reduced for fabricated citations. Surfaces the cost so the
+ * recruiter can see the LLM was caught extrapolating beyond evidence.
+ */
+function renderHallucinationWarning(candidate: ScoredCandidate): string | null {
+  const offenders = candidate.score.breakdown.filter(
+    (c) => c.hallucinationPenalty !== undefined,
+  );
+  if (offenders.length === 0) return null;
+
+  const totalFakes = offenders.reduce(
+    (sum, c) => sum + (c.hallucinationPenalty?.hallucinatedCount ?? 0),
+    0,
+  );
+  const dimSummary = offenders
+    .map((c) => {
+      const pct = Math.round((c.hallucinationPenalty?.penaltyApplied ?? 0) * 100);
+      return `${c.dimension} -${pct}%`;
+    })
+    .join(', ');
+
+  const noun = totalFakes === 1 ? 'citation' : 'citations';
+  return chalk.yellow(`  ⚠ ${totalFakes} hallucinated ${noun} (${dimSummary})`);
+}
+
 export function renderCandidateCard(candidate: ScoredCandidate): string {
   const lines: string[] = [];
   const total = candidate.score.total;
@@ -96,6 +122,12 @@ export function renderCandidateCard(candidate: ScoredCandidate): string {
       (s) => `${s.dimension}: ${s.raw.toFixed(1)}`,
     );
     lines.push(`  ${signalParts.join('   ')}`);
+  }
+
+  // H-9: surface hallucination penalty when any dimension was hit
+  const hallucinationLine = renderHallucinationWarning(candidate);
+  if (hallucinationLine) {
+    lines.push(hallucinationLine);
   }
 
   // Narrative

@@ -28,9 +28,16 @@ export function formatScoreBreakdown(score: Score): string {
   const lines = [`Total: ${score.total}/100`];
 
   for (const comp of score.breakdown) {
-    lines.push(
-      `- ${comp.dimension}: ${comp.raw} × ${comp.weight.toFixed(2)} = ${comp.weighted.toFixed(1)} (confidence: ${comp.confidence})`,
-    );
+    let line = `- ${comp.dimension}: ${comp.raw} × ${comp.weight.toFixed(2)} = ${comp.weighted.toFixed(1)} (confidence: ${comp.confidence})`;
+    // H-9: surface hallucination penalty so the narrative can reference it
+    // and the model is aware which dimensions had fabricated citations.
+    if (comp.hallucinationPenalty) {
+      const { hallucinatedCount, totalCitedCount, penaltyApplied, rawScoreBeforePenalty } =
+        comp.hallucinationPenalty;
+      const pct = Math.round(penaltyApplied * 100);
+      line += ` [${hallucinatedCount}/${totalCitedCount} citations hallucinated → -${pct}% from ${rawScoreBeforePenalty}]`;
+    }
+    lines.push(line);
   }
 
   if (score.redFlags.length > 0) {

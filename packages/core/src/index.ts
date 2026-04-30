@@ -16,6 +16,7 @@ export { generateEvidenceId } from './evidence.js';
 export type {
   RedFlag,
   SignalDimension,
+  HallucinationPenalty,
   ScoreComponent,
   Score,
   ExtractedSignals,

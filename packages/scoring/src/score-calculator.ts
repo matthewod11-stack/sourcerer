@@ -59,6 +59,11 @@ export function calculateScore(
       weighted,
       evidenceIds: signal.evidenceIds,
       confidence: signal.confidence,
+      // H-9: forward hallucination metadata to the breakdown so renderers
+      // (runs show, JSON output, narrative prompt) can surface it.
+      ...(signal.hallucinationPenalty
+        ? { hallucinationPenalty: signal.hallucinationPenalty }
+        : {}),
     };
   });
 

@@ -7,6 +7,10 @@ import type {
   EvidenceItem,
   TokenUsage,
 } from '@sourcerer/core';
+import {
+  computeHallucinationPenalty,
+  HALLUCINATION_PENALTY_FLOOR,
+} from '../grounding-validator.js';
 
 const ZERO_USAGE: TokenUsage = {
   inputTokens: 0,
@@ -120,9 +124,9 @@ describe('Grounding Validator', () => {
     expect(result.validated.reachability.confidence).toBe(0.95);
   });
 
-  it('strips invalid evidence IDs and reduces confidence', () => {
+  it('strips invalid evidence IDs, reduces confidence, and applies score penalty (H-9)', () => {
     const signals = makeValidSignals(evidenceIdList);
-    // Inject a fabricated ID into technicalDepth
+    // Inject a fabricated ID into technicalDepth (was 2 valid → now 1 fake of 3 total)
     signals.technicalDepth.evidenceIds.push('ev-fakeid');
 
     const result = validateGrounding(signals, canonicalIds);
@@ -133,9 +137,18 @@ describe('Grounding Validator', () => {
       invalidId: 'ev-fakeid',
       action: 'removed',
     });
-    // 2 of 3 IDs survived → confidence * (2/3)
     expect(result.validated.technicalDepth.evidenceIds).toHaveLength(2);
+    // Confidence: 2 of 3 IDs survived → confidence × (2/3)
     expect(result.validated.technicalDepth.confidence).toBeCloseTo(0.9 * (2 / 3));
+    // Score (H-9): max(0.15 × 1, 1/3) = 0.333 → score × (1 - 0.333) = score × 0.667
+    expect(result.validated.technicalDepth.score).toBeCloseTo(82 * (2 / 3), 5);
+    // Metadata surfaces the penalty for renderers
+    expect(result.validated.technicalDepth.hallucinationPenalty).toEqual({
+      hallucinatedCount: 1,
+      totalCitedCount: 3,
+      penaltyApplied: 1 / 3,
+      rawScoreBeforePenalty: 82,
+    });
   });
 
   it('drops red flags with invalid evidence IDs', () => {
@@ -156,7 +169,7 @@ describe('Grounding Validator', () => {
     });
   });
 
-  it('zeros confidence when all IDs are invalid', () => {
+  it('zeros confidence and score when all IDs are invalid (H-9)', () => {
     const signals: ExtractedSignals = {
       technicalDepth: { score: 50, evidenceIds: ['ev-fake1', 'ev-fake2'], confidence: 0.8 },
       domainRelevance: { score: 50, evidenceIds: [], confidence: 0.5 },
@@ -170,10 +183,13 @@ describe('Grounding Validator', () => {
 
     expect(result.validated.technicalDepth.evidenceIds).toHaveLength(0);
     expect(result.validated.technicalDepth.confidence).toBe(0);
+    // 2 of 2 hallucinated → 100% penalty → score zeros out (no cap, by design)
+    expect(result.validated.technicalDepth.score).toBe(0);
+    expect(result.validated.technicalDepth.hallucinationPenalty?.penaltyApplied).toBe(1);
     expect(result.violations).toHaveLength(2);
   });
 
-  it('preserves confidence=1 for dimensions with empty evidenceIds', () => {
+  it('preserves confidence=1 and score for dimensions with empty evidenceIds', () => {
     const signals: ExtractedSignals = {
       technicalDepth: { score: 30, evidenceIds: [], confidence: 0.3 },
       domainRelevance: { score: 30, evidenceIds: [], confidence: 0.3 },
@@ -185,9 +201,65 @@ describe('Grounding Validator', () => {
 
     const result = validateGrounding(signals, canonicalIds);
 
-    // No IDs to validate → ratio = 1 → confidence unchanged
+    // No IDs to validate → ratio = 1 → confidence unchanged, score unchanged,
+    // no hallucinationPenalty attached.
     expect(result.validated.technicalDepth.confidence).toBe(0.3);
+    expect(result.validated.technicalDepth.score).toBe(30);
+    expect(result.validated.technicalDepth.hallucinationPenalty).toBeUndefined();
     expect(result.violations).toHaveLength(0);
+  });
+
+  it('omits hallucinationPenalty when grounding is clean (H-9)', () => {
+    const signals = makeValidSignals(evidenceIdList);
+    const result = validateGrounding(signals, canonicalIds);
+    for (const dim of ['technicalDepth', 'domainRelevance', 'trajectoryMatch', 'cultureFit', 'reachability'] as const) {
+      expect(result.validated[dim].hallucinationPenalty).toBeUndefined();
+    }
+  });
+});
+
+// H-9: pressure-test the penalty formula against the agreed table.
+// See docs/hardening-roadmap-2026-04-16.md §H-9 + the design discussion in
+// PROGRESS.md (2026-04-30).
+describe('computeHallucinationPenalty (H-9)', () => {
+  it('returns 0 for clean grounding (no fakes)', () => {
+    expect(computeHallucinationPenalty(0, 5)).toBe(0);
+  });
+
+  it('returns 0 when no IDs were cited (defensive)', () => {
+    expect(computeHallucinationPenalty(0, 0)).toBe(0);
+  });
+
+  it('proportional rate dominates when ratio > floor (1 of 5 → 20%)', () => {
+    // floor = 0.15, proportional = 0.20 → max = 0.20
+    expect(computeHallucinationPenalty(1, 5)).toBeCloseTo(0.2);
+  });
+
+  it('floor dominates when ratio < floor (1 of 50 → 15%, prevents padding attack)', () => {
+    // floor = 0.15, proportional = 0.02 → max = 0.15
+    expect(computeHallucinationPenalty(1, 50)).toBeCloseTo(HALLUCINATION_PENALTY_FLOOR);
+  });
+
+  it('1 of 1 → 100% (full fabrication, no cap)', () => {
+    expect(computeHallucinationPenalty(1, 1)).toBe(1);
+  });
+
+  it('5 of 50 → 75% from floor (5 × 0.15), not 10% from proportional', () => {
+    expect(computeHallucinationPenalty(5, 50)).toBeCloseTo(0.75);
+  });
+
+  it('clamps at 1.0 when floor would exceed it (7 fakes × 0.15 = 1.05 → 1.0)', () => {
+    expect(computeHallucinationPenalty(7, 100)).toBe(1);
+  });
+
+  it('matches the agreed pricing table exactly', () => {
+    // From the H-9 design discussion (2026-04-30):
+    // | Scenario              | hallucinated | total | penalty |
+    expect(computeHallucinationPenalty(0, 5)).toBe(0); // clean
+    expect(computeHallucinationPenalty(1, 5)).toBeCloseTo(0.2); // minor slip
+    expect(computeHallucinationPenalty(1, 1)).toBe(1); // mostly fabricated
+    expect(computeHallucinationPenalty(1, 50)).toBeCloseTo(0.15); // padding attempt
+    expect(computeHallucinationPenalty(5, 50)).toBeCloseTo(0.75); // aggressive padding
   });
 });
 
