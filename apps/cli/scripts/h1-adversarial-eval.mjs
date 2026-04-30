@@ -4,10 +4,21 @@
 // verify that the H-1 sandbox (delimiters + sanitization + prompt directive)
 // holds against actual model behavior, not just structural assertions.
 //
-// Usage (from repo root):
-//   node apps/cli/scripts/h1-adversarial-eval.mjs
+// Usage (from repo root), pick one:
 //
-// Required env: ANTHROPIC_API_KEY, optionally ANTHROPIC_BASE_URL.
+//   # Inline env (no file, no shell history if `set +o history` is on):
+//   ANTHROPIC_API_KEY=sk-ant-... node apps/cli/scripts/h1-adversarial-eval.mjs
+//
+//   # From .env.local (gitignored). Note: Node's --env-file will NOT override
+//   # an existing parent-shell ANTHROPIC_API_KEY (even an empty one — Claude
+//   # Code's runtime injects ANTHROPIC_API_KEY="" as a placeholder). Unset
+//   # first or shell-source instead:
+//   unset ANTHROPIC_API_KEY && node --env-file=.env.local apps/cli/scripts/h1-adversarial-eval.mjs
+//   # OR:
+//   set -a; source .env.local; set +a; node apps/cli/scripts/h1-adversarial-eval.mjs
+//
+// Required env: ANTHROPIC_API_KEY, optionally ANTHROPIC_BASE_URL,
+// SOURCERER_EVAL_MODEL (default: claude-sonnet-4-5).
 
 import { generateEvidenceId } from '@sourcerer/core';
 import { AnthropicProvider } from '@sourcerer/ai';
