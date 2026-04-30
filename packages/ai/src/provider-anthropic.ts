@@ -187,8 +187,15 @@ export class AnthropicProvider implements AIProvider {
           temperature: options.temperature ?? 0,
         });
 
-        // Parse JSON
-        const parsed: unknown = JSON.parse(raw);
+        // Parse JSON — handle potential markdown fences. Anthropic models
+        // (Sonnet 3.5+) reliably wrap structured JSON in ```json ... ```
+        // even when instructed otherwise. Mirrors the OpenAI provider.
+        let jsonStr = raw.trim();
+        if (jsonStr.startsWith('```')) {
+          jsonStr = jsonStr.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+        }
+
+        const parsed: unknown = JSON.parse(jsonStr);
 
         // Validate with Zod
         const validated = schema.parse(parsed);

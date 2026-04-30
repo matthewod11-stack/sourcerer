@@ -183,6 +183,49 @@ describe('AnthropicProvider', () => {
         expect.objectContaining({ temperature: 0 }),
       );
     });
+
+    // Sonnet 3.5+ reliably wraps structured JSON output in ```json ... ```
+    // markdown fences even when instructed otherwise. The parser must strip
+    // them — discovered while running the H-1 adversarial eval against
+    // claude-sonnet-4-5 (#18). Mirrors the OpenAI provider's behavior.
+    it('strips markdown ```json fences before parsing', async () => {
+      mockCreate.mockResolvedValueOnce({
+        content: [{ type: 'text', text: '```json\n{"name": "Dana", "age": 42}\n```' }],
+      });
+
+      const result = await provider.structuredOutput(
+        [{ role: 'user', content: 'Get user info' }],
+        { schema: testSchema },
+      );
+
+      expect(result).toEqual({ name: 'Dana', age: 42 });
+    });
+
+    it('strips bare ``` fences (no language hint) before parsing', async () => {
+      mockCreate.mockResolvedValueOnce({
+        content: [{ type: 'text', text: '```\n{"name": "Eve", "age": 33}\n```' }],
+      });
+
+      const result = await provider.structuredOutput(
+        [{ role: 'user', content: 'Get user info' }],
+        { schema: testSchema },
+      );
+
+      expect(result).toEqual({ name: 'Eve', age: 33 });
+    });
+
+    it('handles fenced response with surrounding whitespace', async () => {
+      mockCreate.mockResolvedValueOnce({
+        content: [{ type: 'text', text: '   \n```json\n{"name": "Frank", "age": 50}\n```   ' }],
+      });
+
+      const result = await provider.structuredOutput(
+        [{ role: 'user', content: 'Get user info' }],
+        { schema: testSchema },
+      );
+
+      expect(result).toEqual({ name: 'Frank', age: 50 });
+    });
   });
 
   describe('name', () => {
