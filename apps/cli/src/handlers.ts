@@ -22,6 +22,7 @@ import type {
   AIProvider,
   TalentProfile,
 } from '@sourcerer/core';
+import { redactPII } from '@sourcerer/core';
 import type { ExaAdapter } from '@sourcerer/adapter-exa';
 import type { GitHubAdapter } from '@sourcerer/adapter-github';
 import type { XAdapter } from '@sourcerer/adapter-x';
@@ -250,7 +251,11 @@ export function createEnrichHandler(
             // Merge candidate[i] into candidate[existingIdx]
             const primary = candidates[existingIdx];
             const duplicate = candidates[i];
-            console.log(`[enrich] Merging duplicate: ${duplicate.name} → ${primary.name} (shared email: ${email})`);
+            // H-3: never log raw PII to stdout — terminal scrollback, CI logs,
+            // and redirected stdout would otherwise preserve email addresses.
+            console.log(
+              `[enrich] Merging duplicate: ${duplicate.name} → ${primary.name} (shared email: ${redactPII(email, 'email')})`,
+            );
 
             // Merge evidence (deduplicate by ID)
             const existingEvIds = new Set(primary.evidence.map((e) => e.id));

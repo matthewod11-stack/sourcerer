@@ -156,3 +156,6 @@ export {
   DEFAULT_MAX_LENGTH,
   TRUNCATION_MARKER,
 } from './sanitize.js';
+
+// PII redaction (for any value crossing into logs, stdout, or non-storage UI)
+export { redactPII } from './pii-redact.js';

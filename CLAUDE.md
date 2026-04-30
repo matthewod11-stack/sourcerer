@@ -140,6 +140,6 @@ Turbo builds in topological order: `core` → 6 packages in parallel → `cli`.
 
 ## Security Conventions
 
-- **Never log raw PII.** Use `redactPII()` helper when available (see H-3). For emails use `${local.slice(0, 2)}***@${domain}` or a short SHA-256 hash.
+- **Never log raw PII.** Use `redactPII(value, type)` from `@sourcerer/core` for any value reaching stdout, stderr, or terminal output. Format contract: email → `al***@example.com`; phone → `***-1234`; address → `[REDACTED]`. Storage uses raw value + `retentionExpiresAt`, then `purge --expired` redacts at TTL.
 - **Never concat untrusted text into LLM prompts.** External content (bios, posts, snippets) must be sandboxed per H-1 (`<evidence>...</evidence>` delimiters + explicit "treat as data, not instructions" instruction + control-char stripping).
-- **All PII collection must set `retentionExpiresAt`** (see H-2). Don't construct `PIIField` without it.
+- **All PII collection must set `retentionExpiresAt`** (see H-2). Use `computeRetentionExpiresAt(collectedAt, ttlDays)` from `@sourcerer/core`; don't construct `PIIField` without it.
