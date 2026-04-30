@@ -1,7 +1,7 @@
 # Sourcerer — Roadmap
 
 > **Last updated:** 2026-04-30
-> **Active workstream:** Hardening (audit-driven — see [`docs/hardening-roadmap-2026-04-16.md`](docs/hardening-roadmap-2026-04-16.md))
+> **Active workstream:** Hardening Phase 3 (Phases 1 + 2 ✅ complete — see [`docs/hardening-roadmap-2026-04-16.md`](docs/hardening-roadmap-2026-04-16.md))
 > **Paused workstream:** V1 product backlog — Phase 7.2 / 7.5 / 7.6 / 7.7 (see [`docs/roadmap.md`](docs/roadmap.md))
 
 This file is the single source of truth for `/session-start` task selection. Phased lists are ordered by dependency. The first unchecked `[ ]` item is the next task.
@@ -17,10 +17,10 @@ Full item specs (Problem, Fix, Files, Acceptance, Effort) live in [`docs/hardeni
 - [x] [**H-2** #6](https://github.com/matthewod11-stack/sourcerer/issues/6) Populate `retentionExpiresAt` at PII collection time — M — no deps ✅ 2026-04-30
 - [x] [**H-3** #7](https://github.com/matthewod11-stack/sourcerer/issues/7) Stop logging raw PII to stdout — S — no deps ✅ 2026-04-30
 
-### Phase 2 — Model defaults, Zod config, determinism (parallel-safe)
-- [ ] [**H-4** #8](https://github.com/matthewod11-stack/sourcerer/issues/8) Upgrade Anthropic default model to `claude-sonnet-4-6` — S — no deps
-- [ ] [**H-5** #9](https://github.com/matthewod11-stack/sourcerer/issues/9) Replace hand-rolled config validator with Zod — S — no deps
-- [ ] [**H-10** #10](https://github.com/matthewod11-stack/sourcerer/issues/10) Stable sort for GitHub repo selection — S — no deps
+### Phase 2 — Model defaults, Zod config, determinism (parallel-safe) ✅ COMPLETE 2026-04-30
+- [x] [**H-4** #8](https://github.com/matthewod11-stack/sourcerer/issues/8) Upgrade Anthropic default model to `claude-sonnet-4-6` — S — no deps ✅ 2026-04-30
+- [x] [**H-5** #9](https://github.com/matthewod11-stack/sourcerer/issues/9) Replace hand-rolled config validator with Zod — S — no deps ✅ 2026-04-30
+- [x] [**H-10** #10](https://github.com/matthewod11-stack/sourcerer/issues/10) Stable sort for GitHub repo selection — S — no deps ✅ 2026-04-30
 
 ### Phase 3 — Boundaries, cost, grounding
 - [ ] [**H-6** #11](https://github.com/matthewod11-stack/sourcerer/issues/11) Zod-parse checkpoint and intake-context deserialization — S — needs #9
