@@ -6,7 +6,15 @@ import type {
   ExtractedSignals,
   Score,
   EvidenceItem,
+  TokenUsage,
 } from '@sourcerer/core';
+
+const ZERO_USAGE: TokenUsage = {
+  inputTokens: 0,
+  outputTokens: 0,
+  cachedTokens: 0,
+  model: 'mock',
+};
 import { generateEvidenceId } from '@sourcerer/core';
 import { generateNarrative, formatScoreBreakdown } from '../narrative-generator.js';
 
@@ -71,7 +79,7 @@ const MOCK_NARRATIVE = `Jane Doe is a strong candidate for the Senior Backend En
 function makeMockProvider(): AIProvider {
   return {
     name: 'mock',
-    chat: vi.fn().mockResolvedValue(MOCK_NARRATIVE),
+    chat: vi.fn().mockResolvedValue({ content: MOCK_NARRATIVE, usage: ZERO_USAGE }),
     structuredOutput: vi.fn(),
   };
 }
@@ -83,8 +91,9 @@ describe('generateNarrative', () => {
     const provider = makeMockProvider();
     const result = await generateNarrative(candidate, talentProfile, signals, score, provider);
 
-    expect(result).toBe(MOCK_NARRATIVE);
-    expect(result).toContain('Jane Doe');
+    expect(result.narrative).toBe(MOCK_NARRATIVE);
+    expect(result.narrative).toContain('Jane Doe');
+    expect(result.usage).toEqual(ZERO_USAGE);
   });
 
   it('calls provider.chat (not structuredOutput)', async () => {
@@ -130,7 +139,7 @@ describe('generateNarrative', () => {
     const emptyCandidate: Candidate = { ...candidate, evidence: [] };
 
     const result = await generateNarrative(emptyCandidate, talentProfile, signals, score, provider);
-    expect(result).toBe(MOCK_NARRATIVE);
+    expect(result.narrative).toBe(MOCK_NARRATIVE);
 
     const prompt = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0][0].content as string;
     expect(prompt).toContain('(no evidence available)');

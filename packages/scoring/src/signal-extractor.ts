@@ -6,6 +6,7 @@ import type {
   AIProvider,
   ExtractedSignals,
   EvidenceItem,
+  TokenUsage,
 } from '@sourcerer/core';
 import { sanitizeUntrustedText } from '@sourcerer/core';
 import { renderTemplate } from '@sourcerer/ai';
@@ -22,6 +23,7 @@ export interface ExtractSignalsOptions {
 export interface SignalExtractionResult {
   signals: ExtractedSignals;
   grounding: GroundingResult;
+  usage: TokenUsage;
 }
 
 /**
@@ -114,7 +116,7 @@ export async function extractSignals(
   const prompt = await renderTemplate('scoring-signal-extract', templateVars);
 
   // Call LLM with structured output
-  const rawSignals = await provider.structuredOutput<ExtractedSignals>(
+  const { data: rawSignals, usage } = await provider.structuredOutput<ExtractedSignals>(
     [{ role: 'user', content: prompt }],
     {
       schema: ExtractedSignalsSchema,
@@ -129,5 +131,6 @@ export async function extractSignals(
   return {
     signals: grounding.validated,
     grounding,
+    usage,
   };
 }

@@ -5,7 +5,15 @@ import type {
   TalentProfile,
   ExtractedSignals,
   EvidenceItem,
+  TokenUsage,
 } from '@sourcerer/core';
+
+const ZERO_USAGE: TokenUsage = {
+  inputTokens: 0,
+  outputTokens: 0,
+  cachedTokens: 0,
+  model: 'mock',
+};
 import { generateEvidenceId } from '@sourcerer/core';
 import { extractSignals, formatEvidence, formatTalentProfile } from '../signal-extractor.js';
 import { validateGrounding } from '../grounding-validator.js';
@@ -95,8 +103,8 @@ function makeValidSignals(ids: string[]): ExtractedSignals {
 function makeMockProvider(returnSignals: ExtractedSignals): AIProvider {
   return {
     name: 'mock',
-    chat: vi.fn().mockResolvedValue(''),
-    structuredOutput: vi.fn().mockResolvedValue(returnSignals),
+    chat: vi.fn().mockResolvedValue({ content: '', usage: ZERO_USAGE }),
+    structuredOutput: vi.fn().mockResolvedValue({ data: returnSignals, usage: ZERO_USAGE }),
   };
 }
 

@@ -99,12 +99,13 @@ export async function buildCompositeProfile(
     },
   ];
 
-  return aiProvider.structuredOutput<{
+  const { data } = await aiProvider.structuredOutput<{
     careerTrajectories: CareerStep[][];
     skillSignatures: string[];
     seniorityCalibration: string;
     cultureSignals: string[];
   }>(messages, { schema: CompositeProfileSchema });
+  return data;
 }
 
 /**
@@ -269,7 +270,7 @@ export function createSuccessProfileNodes(
           },
         ];
 
-        const patterns = await aiProvider.structuredOutput<string[]>(
+        const { data: patterns } = await aiProvider.structuredOutput<string[]>(
           messages,
           { schema: AntiPatternsSchema },
         );

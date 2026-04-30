@@ -14,7 +14,7 @@ export type { ScoreOptions } from './score-calculator.js';
 
 // Narrative generation
 export { generateNarrative, formatScoreBreakdown } from './narrative-generator.js';
-export type { NarrativeOptions } from './narrative-generator.js';
+export type { NarrativeOptions, NarrativeResult } from './narrative-generator.js';
 
 // Zod schemas for LLM output validation
 export {

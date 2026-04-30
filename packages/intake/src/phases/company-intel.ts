@@ -134,7 +134,7 @@ ${context.companyIntel ? `Existing analysis:\n${JSON.stringify(context.companyIn
           },
         ];
 
-        const intel = await aiProvider.structuredOutput<Omit<CompanyIntel, 'url' | 'analyzedAt'>>(
+        const { data: intel } = await aiProvider.structuredOutput<Omit<CompanyIntel, 'url' | 'analyzedAt'>>(
           messages,
           { schema: CompanyIntelPartialSchema },
         );
@@ -210,7 +210,7 @@ Existing competitors from analysis: ${JSON.stringify(context.companyIntel?.compe
           },
         ];
 
-        const map = await aiProvider.structuredOutput<CompetitorMap>(
+        const { data: map } = await aiProvider.structuredOutput<CompetitorMap>(
           messages,
           { schema: CompetitorMapSchema },
         );

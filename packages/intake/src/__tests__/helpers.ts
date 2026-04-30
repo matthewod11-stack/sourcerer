@@ -4,7 +4,10 @@ import type {
   AIProvider,
   Message,
   ChatOptions,
+  ChatResult,
   StructuredOutputOptions,
+  StructuredOutputResult,
+  TokenUsage,
   ContentResearch,
   CrawledContent,
   CompanyIntel,
@@ -16,6 +19,13 @@ import type {
   CompetitorMap,
   CareerStep,
 } from '@sourcerer/core';
+
+const ZERO_USAGE: TokenUsage = {
+  inputTokens: 0,
+  outputTokens: 0,
+  cachedTokens: 0,
+  model: 'mock',
+};
 
 import type { UrlCrawler, GitHubAnalyzer, SimilaritySearcher } from '../content-research.js';
 
@@ -36,14 +46,20 @@ export function createMockAIProvider(overrides?: {
 }): AIProvider {
   return {
     name: 'mock',
-    async chat(messages: Message[], _options?: ChatOptions): Promise<string> {
-      return overrides?.chatResponse ?? 'mock response';
+    async chat(_messages: Message[], _options?: ChatOptions): Promise<ChatResult> {
+      return {
+        content: overrides?.chatResponse ?? 'mock response',
+        usage: ZERO_USAGE,
+      };
     },
-    async structuredOutput<T>(messages: Message[], options: StructuredOutputOptions): Promise<T> {
-      if (overrides?.structuredOutputHandler) {
-        return overrides.structuredOutputHandler(messages, options) as T;
-      }
-      return {} as T;
+    async structuredOutput<T>(
+      messages: Message[],
+      options: StructuredOutputOptions,
+    ): Promise<StructuredOutputResult<T>> {
+      const data = overrides?.structuredOutputHandler
+        ? (overrides.structuredOutputHandler(messages, options) as T)
+        : ({} as T);
+      return { data, usage: ZERO_USAGE };
     },
   };
 }

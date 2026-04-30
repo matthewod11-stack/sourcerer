@@ -62,7 +62,7 @@ If information is not available, omit the field. Be thorough in extracting skill
           },
         ];
 
-        const roleParams = await aiProvider.structuredOutput<RoleParameters>(
+        const { data: roleParams } = await aiProvider.structuredOutput<RoleParameters>(
           messages,
           { schema: RoleParametersSchema },
         );
@@ -178,7 +178,7 @@ ${JSON.stringify(currentParams, null, 2)}`,
           },
         ];
 
-        const updatedParams = await aiProvider.structuredOutput<RoleParameters>(
+        const { data: updatedParams } = await aiProvider.structuredOutput<RoleParameters>(
           messages,
           { schema: RoleParametersSchema },
         );

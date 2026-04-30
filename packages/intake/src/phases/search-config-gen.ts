@@ -64,10 +64,11 @@ Team profiles: ${context.teamProfiles ? `${context.teamProfiles.length} analyzed
     },
   ];
 
-  return aiProvider.structuredOutput<SearchQueryTier[]>(
+  const { data } = await aiProvider.structuredOutput<SearchQueryTier[]>(
     messages,
     { schema: SearchQueryTierArraySchema },
   );
+  return data;
 }
 
 /**
@@ -97,10 +98,11 @@ Must-have skills: ${JSON.stringify(context.roleParameters?.mustHaveSkills ?? [])
     },
   ];
 
-  return aiProvider.structuredOutput<ScoringWeights>(
+  const { data } = await aiProvider.structuredOutput<ScoringWeights>(
     messages,
     { schema: ScoringWeightsSchema },
   );
+  return data;
 }
 
 /**
@@ -336,7 +338,7 @@ If their request relates to role parameters, company info, or team data, indicat
           },
         ];
 
-        const adjustments = await aiProvider.structuredOutput<Record<string, unknown>>(
+        const { data: adjustments } = await aiProvider.structuredOutput<Record<string, unknown>>(
           messages,
           { schema: AdjustmentsSchema },
         );

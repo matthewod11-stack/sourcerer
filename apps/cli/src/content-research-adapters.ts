@@ -80,7 +80,7 @@ export function createGitHubAnalyzer(
         },
       ];
 
-      const analysis = await aiProvider.structuredOutput<{
+      const { data: analysis } = await aiProvider.structuredOutput<{
         name?: string;
         careerTrajectory: Array<{
           company: string;

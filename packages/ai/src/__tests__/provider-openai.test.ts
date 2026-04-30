@@ -34,6 +34,7 @@ describe('OpenAIProvider', () => {
     it('sends messages and returns text response', async () => {
       mockCreate.mockResolvedValueOnce({
         choices: [{ message: { content: 'Hello from GPT!' } }],
+        usage: { prompt_tokens: 100, completion_tokens: 20, prompt_tokens_details: { cached_tokens: 0 } },
       });
 
       const messages: Message[] = [
@@ -41,7 +42,8 @@ describe('OpenAIProvider', () => {
       ];
 
       const result = await provider.chat(messages);
-      expect(result).toBe('Hello from GPT!');
+      expect(result.content).toBe('Hello from GPT!');
+      expect(result.usage).toEqual({ inputTokens: 100, outputTokens: 20, cachedTokens: 0, model: 'gpt-4o' });
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           model: 'gpt-4o',
@@ -53,6 +55,7 @@ describe('OpenAIProvider', () => {
     it('includes system message in messages array', async () => {
       mockCreate.mockResolvedValueOnce({
         choices: [{ message: { content: 'OK' } }],
+        usage: { prompt_tokens: 50, completion_tokens: 5 },
       });
 
       const messages: Message[] = [
@@ -75,6 +78,7 @@ describe('OpenAIProvider', () => {
     it('passes model and temperature options', async () => {
       mockCreate.mockResolvedValueOnce({
         choices: [{ message: { content: 'OK' } }],
+        usage: { prompt_tokens: 50, completion_tokens: 5 },
       });
 
       await provider.chat(
@@ -94,10 +98,11 @@ describe('OpenAIProvider', () => {
     it('handles empty response content', async () => {
       mockCreate.mockResolvedValueOnce({
         choices: [{ message: { content: null } }],
+        usage: { prompt_tokens: 5, completion_tokens: 0 },
       });
 
       const result = await provider.chat([{ role: 'user', content: 'test' }]);
-      expect(result).toBe('');
+      expect(result.content).toBe('');
     });
   });
 
@@ -110,6 +115,7 @@ describe('OpenAIProvider', () => {
     it('parses valid JSON response', async () => {
       mockCreate.mockResolvedValueOnce({
         choices: [{ message: { content: '{"title": "Test", "count": 5}' } }],
+        usage: { prompt_tokens: 80, completion_tokens: 12 },
       });
 
       const result = await provider.structuredOutput(
@@ -117,7 +123,9 @@ describe('OpenAIProvider', () => {
         { schema: testSchema },
       );
 
-      expect(result).toEqual({ title: 'Test', count: 5 });
+      expect(result.data).toEqual({ title: 'Test', count: 5 });
+      expect(result.usage.inputTokens).toBe(80);
+      expect(result.usage.outputTokens).toBe(12);
     });
 
     it('strips markdown fences from JSON response', async () => {
@@ -129,6 +137,7 @@ describe('OpenAIProvider', () => {
             },
           },
         ],
+        usage: { prompt_tokens: 50, completion_tokens: 8 },
       });
 
       const result = await provider.structuredOutput(
@@ -136,16 +145,18 @@ describe('OpenAIProvider', () => {
         { schema: testSchema },
       );
 
-      expect(result).toEqual({ title: 'Fenced', count: 10 });
+      expect(result.data).toEqual({ title: 'Fenced', count: 10 });
     });
 
     it('retries on invalid JSON', async () => {
       mockCreate
         .mockResolvedValueOnce({
           choices: [{ message: { content: 'Not JSON' } }],
+          usage: { prompt_tokens: 50, completion_tokens: 5 },
         })
         .mockResolvedValueOnce({
           choices: [{ message: { content: '{"title": "Retry", "count": 1}' } }],
+          usage: { prompt_tokens: 50, completion_tokens: 8 },
         });
 
       const result = await provider.structuredOutput(
@@ -153,7 +164,10 @@ describe('OpenAIProvider', () => {
         { schema: testSchema },
       );
 
-      expect(result).toEqual({ title: 'Retry', count: 1 });
+      expect(result.data).toEqual({ title: 'Retry', count: 1 });
+      // Retry tokens accumulate — both attempts charged real spend.
+      expect(result.usage.inputTokens).toBe(100);
+      expect(result.usage.outputTokens).toBe(13);
       expect(mockCreate).toHaveBeenCalledTimes(2);
     });
 
@@ -161,9 +175,11 @@ describe('OpenAIProvider', () => {
       mockCreate
         .mockResolvedValueOnce({
           choices: [{ message: { content: '{"title": "Missing count"}' } }],
+          usage: { prompt_tokens: 50, completion_tokens: 5 },
         })
         .mockResolvedValueOnce({
           choices: [{ message: { content: '{"title": "Fixed", "count": 42}' } }],
+          usage: { prompt_tokens: 50, completion_tokens: 8 },
         });
 
       const result = await provider.structuredOutput(
@@ -171,12 +187,13 @@ describe('OpenAIProvider', () => {
         { schema: testSchema },
       );
 
-      expect(result).toEqual({ title: 'Fixed', count: 42 });
+      expect(result.data).toEqual({ title: 'Fixed', count: 42 });
     });
 
     it('throws after max retries', async () => {
       mockCreate.mockResolvedValue({
         choices: [{ message: { content: 'never valid json' } }],
+        usage: { prompt_tokens: 30, completion_tokens: 5 },
       });
 
       await expect(

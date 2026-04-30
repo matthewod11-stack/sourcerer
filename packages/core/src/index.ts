@@ -60,7 +60,10 @@ export type {
   MessageRole,
   Message,
   ChatOptions,
+  ChatResult,
   StructuredOutputOptions,
+  StructuredOutputResult,
+  TokenUsage,
   AIProvider,
 } from './ai.js';
 

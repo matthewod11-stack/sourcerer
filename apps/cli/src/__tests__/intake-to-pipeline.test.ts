@@ -6,7 +6,10 @@ import type {
   AIProvider,
   Message,
   ChatOptions,
+  ChatResult,
   StructuredOutputOptions,
+  StructuredOutputResult,
+  TokenUsage,
   RawCandidate,
   PhaseHandler,
   IntakePhaseOutput,
@@ -14,6 +17,13 @@ import type {
   DedupPhaseOutput,
   EnrichPhaseOutput,
 } from '@sourcerer/core';
+
+const ZERO_USAGE: TokenUsage = {
+  inputTokens: 0,
+  outputTokens: 0,
+  cachedTokens: 0,
+  model: 'mock',
+};
 import {
   PipelineRunner,
   createDedupHandler,
@@ -33,71 +43,74 @@ import { createStubScoreHandler, createOutputHandler } from '../handlers.js';
 // --- Mocks ---
 
 function createMockAI(): AIProvider {
+  function pickStructuredData<T>(messages: Message[]): T {
+    const systemMsg = messages[0]?.content ?? '';
+    if (systemMsg.includes('role') || systemMsg.includes('job')) {
+      return {
+        title: 'Backend Engineer',
+        level: 'Senior',
+        scope: 'Backend',
+        mustHaveSkills: ['Go'],
+        niceToHaveSkills: [],
+      } as T;
+    }
+    if (systemMsg.includes('competitor')) {
+      return {
+        targetCompanies: ['Chainlink'],
+        avoidCompanies: [],
+        competitorReason: { Chainlink: 'Similar infra' },
+      } as T;
+    }
+    if (systemMsg.includes('company') || systemMsg.includes('Company')) {
+      return {
+        name: 'TestCorp',
+        techStack: ['Go'],
+        cultureSignals: ['remote'],
+      } as T;
+    }
+    if (systemMsg.includes('anti-pattern') || systemMsg.includes('red flag')) {
+      return [] as unknown as T;
+    }
+    if (systemMsg.includes('search queries') || systemMsg.includes('tiered search')) {
+      return [
+        { priority: 1, queries: [{ text: 'backend engineer Go', maxResults: 5 }] },
+      ] as unknown as T;
+    }
+    if (systemMsg.includes('scoring weight') || systemMsg.includes('scoring strateg')) {
+      return {
+        technicalDepth: 0.3,
+        domainRelevance: 0.25,
+        trajectoryMatch: 0.2,
+        cultureFit: 0.15,
+        reachability: 0.1,
+      } as T;
+    }
+    return {
+      title: 'Engineer',
+      level: 'Senior',
+      scope: 'Engineering',
+      mustHaveSkills: [],
+      niceToHaveSkills: [],
+      careerTrajectory: [],
+      skillSignatures: [],
+      cultureSignals: [],
+      queries: [],
+      scoringWeights: {},
+      antiFilters: [],
+      antiPatterns: [],
+      targetCompanies: [],
+      avoidCompanies: [],
+      competitorReason: {},
+    } as T;
+  }
+
   return {
     name: 'mock',
-    async chat(): Promise<string> {
-      return 'ok';
+    async chat(): Promise<ChatResult> {
+      return { content: 'ok', usage: ZERO_USAGE };
     },
-    async structuredOutput<T>(messages: Message[]): Promise<T> {
-      const systemMsg = messages[0]?.content ?? '';
-      if (systemMsg.includes('role') || systemMsg.includes('job')) {
-        return {
-          title: 'Backend Engineer',
-          level: 'Senior',
-          scope: 'Backend',
-          mustHaveSkills: ['Go'],
-          niceToHaveSkills: [],
-        } as T;
-      }
-      if (systemMsg.includes('competitor')) {
-        return {
-          targetCompanies: ['Chainlink'],
-          avoidCompanies: [],
-          competitorReason: { Chainlink: 'Similar infra' },
-        } as T;
-      }
-      if (systemMsg.includes('company') || systemMsg.includes('Company')) {
-        return {
-          name: 'TestCorp',
-          techStack: ['Go'],
-          cultureSignals: ['remote'],
-        } as T;
-      }
-      if (systemMsg.includes('anti-pattern') || systemMsg.includes('red flag')) {
-        return [] as unknown as T;
-      }
-      if (systemMsg.includes('search queries') || systemMsg.includes('tiered search')) {
-        return [
-          { priority: 1, queries: [{ text: 'backend engineer Go', maxResults: 5 }] },
-        ] as unknown as T;
-      }
-      if (systemMsg.includes('scoring weight') || systemMsg.includes('scoring strateg')) {
-        return {
-          technicalDepth: 0.3,
-          domainRelevance: 0.25,
-          trajectoryMatch: 0.2,
-          cultureFit: 0.15,
-          reachability: 0.1,
-        } as T;
-      }
-      // Safe default — includes all array fields as empty arrays
-      return {
-        title: 'Engineer',
-        level: 'Senior',
-        scope: 'Engineering',
-        mustHaveSkills: [],
-        niceToHaveSkills: [],
-        careerTrajectory: [],
-        skillSignatures: [],
-        cultureSignals: [],
-        queries: [],
-        scoringWeights: {},
-        antiFilters: [],
-        antiPatterns: [],
-        targetCompanies: [],
-        avoidCompanies: [],
-        competitorReason: {},
-      } as T;
+    async structuredOutput<T>(messages: Message[]): Promise<StructuredOutputResult<T>> {
+      return { data: pickStructuredData<T>(messages), usage: ZERO_USAGE };
     },
   };
 }

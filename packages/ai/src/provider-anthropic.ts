@@ -6,7 +6,10 @@ import type {
   AIProvider,
   Message,
   ChatOptions,
+  ChatResult,
   StructuredOutputOptions,
+  StructuredOutputResult,
+  TokenUsage,
 } from '@sourcerer/core';
 import type { ResponseCache } from './response-cache.js';
 import { generateCacheKey } from './response-cache.js';
@@ -116,15 +119,22 @@ export class AnthropicProvider implements AIProvider {
     this.cache = config.cache;
   }
 
-  async chat(messages: Message[], options?: ChatOptions): Promise<string> {
+  async chat(messages: Message[], options?: ChatOptions): Promise<ChatResult> {
     const model = options?.model ?? this.defaultModel;
 
-    // Check cache
+    // Check cache. ResponseCache only stores the string content, so a cache hit
+    // reports zero usage (no API call → no current cost). H-7 accepts this
+    // simplification; "savings via cache" is a future enhancement.
     if (this.cache) {
       const promptText = messages.map((m) => `${m.role}:${m.content}`).join('\n');
       const cacheKey = generateCacheKey(promptText, model);
       const cached = await this.cache.get(cacheKey);
-      if (cached) return cached;
+      if (cached) {
+        return {
+          content: cached,
+          usage: { inputTokens: 0, outputTokens: 0, cachedTokens: 0, model },
+        };
+      }
     }
 
     const { system, messages: apiMessages } = splitMessages(messages);
@@ -155,13 +165,21 @@ export class AnthropicProvider implements AIProvider {
       await this.cache.set(cacheKey, result, model);
     }
 
-    return result;
+    const apiUsage = response.usage;
+    const usage: TokenUsage = {
+      inputTokens: apiUsage?.input_tokens ?? 0,
+      outputTokens: apiUsage?.output_tokens ?? 0,
+      cachedTokens: apiUsage?.cache_read_input_tokens ?? 0,
+      model,
+    };
+
+    return { content: result, usage };
   }
 
   async structuredOutput<T>(
     messages: Message[],
     options: StructuredOutputOptions,
-  ): Promise<T> {
+  ): Promise<StructuredOutputResult<T>> {
     const schema = options.schema as z.ZodType<T>;
 
     // Append JSON instruction to the last user message or add a new one
@@ -180,12 +198,15 @@ export class AnthropicProvider implements AIProvider {
     }
 
     let lastError: unknown;
+    let lastUsage: TokenUsage | undefined;
     for (let attempt = 0; attempt <= MAX_STRUCTURED_RETRIES; attempt++) {
       try {
-        const raw = await this.chat(augmentedMessages, {
+        const { content: raw, usage } = await this.chat(augmentedMessages, {
           ...options,
           temperature: options.temperature ?? 0,
         });
+        // Accumulate retries: each attempt's tokens are real spend.
+        lastUsage = mergeUsage(lastUsage, usage);
 
         // Parse JSON — handle potential markdown fences. Anthropic models
         // (Sonnet 3.5+) reliably wrap structured JSON in ```json ... ```
@@ -199,7 +220,7 @@ export class AnthropicProvider implements AIProvider {
 
         // Validate with Zod
         const validated = schema.parse(parsed);
-        return validated;
+        return { data: validated, usage: lastUsage };
       } catch (err) {
         lastError = err;
 
@@ -217,4 +238,18 @@ export class AnthropicProvider implements AIProvider {
       }`,
     );
   }
+}
+
+/**
+ * Sum two `TokenUsage` records, used to accumulate token spend across
+ * structured-output retries (every retry is a real API call).
+ */
+function mergeUsage(a: TokenUsage | undefined, b: TokenUsage): TokenUsage {
+  if (!a) return b;
+  return {
+    inputTokens: a.inputTokens + b.inputTokens,
+    outputTokens: a.outputTokens + b.outputTokens,
+    cachedTokens: a.cachedTokens + b.cachedTokens,
+    model: b.model,
+  };
 }

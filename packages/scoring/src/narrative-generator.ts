@@ -6,6 +6,7 @@ import type {
   AIProvider,
   ExtractedSignals,
   Score,
+  TokenUsage,
 } from '@sourcerer/core';
 import { renderTemplate } from '@sourcerer/ai';
 import { formatEvidence, formatTalentProfile } from './signal-extractor.js';
@@ -13,6 +14,11 @@ import { formatEvidence, formatTalentProfile } from './signal-extractor.js';
 export interface NarrativeOptions {
   model?: string;
   temperature?: number;
+}
+
+export interface NarrativeResult {
+  narrative: string;
+  usage: TokenUsage;
 }
 
 /**
@@ -53,7 +59,7 @@ export async function generateNarrative(
   score: Score,
   provider: AIProvider,
   options?: NarrativeOptions,
-): Promise<string> {
+): Promise<NarrativeResult> {
   const evidence = candidate.evidence;
 
   const templateVars = {
@@ -67,7 +73,7 @@ export async function generateNarrative(
 
   const prompt = await renderTemplate('scoring-narrative', templateVars);
 
-  const narrative = await provider.chat(
+  const { content: narrative, usage } = await provider.chat(
     [{ role: 'user', content: prompt }],
     {
       temperature: options?.temperature ?? 0.3,
@@ -75,5 +81,5 @@ export async function generateNarrative(
     },
   );
 
-  return narrative;
+  return { narrative, usage };
 }

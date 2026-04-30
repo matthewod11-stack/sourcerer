@@ -40,3 +40,13 @@ export type { TemplateContext } from './template-loader.js';
 // Response cache
 export { ResponseCache, generateCacheKey, CACHE_TTL } from './response-cache.js';
 export type { CacheEntry, CacheConfig } from './response-cache.js';
+
+// Pricing & cost computation (H-7)
+export {
+  MODEL_PRICING,
+  AI_COST_PER_CANDIDATE_FALLBACK,
+  computeCost,
+  estimatePerCandidateCost,
+  getModelPricing,
+} from './pricing.js';
+export type { ModelPricing } from './pricing.js';

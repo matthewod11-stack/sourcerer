@@ -33,6 +33,7 @@ import {
   assignTier,
   generateNarrative,
 } from '@sourcerer/scoring';
+import { computeCost } from '@sourcerer/ai';
 
 export function createDiscoverHandler(
   exa: ExaAdapter,
@@ -316,9 +317,6 @@ export function createEnrichHandler(
   };
 }
 
-// Rough cost estimate per LLM call (signal extraction + narrative = 2 calls per candidate)
-const ESTIMATED_COST_PER_SCORING_CALL = 0.005;
-
 export function createScoreHandler(
   searchConfig: SearchConfig,
   talentProfile: TalentProfile,
@@ -332,9 +330,13 @@ export function createScoreHandler(
 
       for (const candidate of input.candidates) {
         try {
-          // 5.1: Extract signals via LLM
-          const { signals } = await extractSignals(candidate, talentProfile, provider);
-          costIncurred += ESTIMATED_COST_PER_SCORING_CALL;
+          // 5.1: Extract signals via LLM. H-7: usage is real per-call accounting.
+          const { signals, usage: extractUsage } = await extractSignals(
+            candidate,
+            talentProfile,
+            provider,
+          );
+          costIncurred += computeCost(extractUsage);
 
           // 5.2: Calculate weighted score
           const score = calculateScore(signals, searchConfig.scoringWeights);
@@ -343,14 +345,14 @@ export function createScoreHandler(
           const tier = assignTier(score.total, searchConfig.tierThresholds);
 
           // 5.3: Generate narrative via LLM
-          const narrative = await generateNarrative(
+          const { narrative, usage: narrativeUsage } = await generateNarrative(
             candidate,
             talentProfile,
             signals,
             score,
             provider,
           );
-          costIncurred += ESTIMATED_COST_PER_SCORING_CALL;
+          costIncurred += computeCost(narrativeUsage);
 
           scoredCandidates.push({
             ...candidate,

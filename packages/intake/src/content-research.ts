@@ -93,7 +93,7 @@ export class ContentResearchEngine implements ContentResearch {
       },
     ];
 
-    const result = await this.ai.structuredOutput<Omit<CompanyIntel, 'url' | 'analyzedAt'>>(
+    const { data: result } = await this.ai.structuredOutput<Omit<CompanyIntel, 'url' | 'analyzedAt'>>(
       messages,
       { schema: CompanyIntelPartialSchema },
     );
@@ -169,7 +169,7 @@ export class ContentResearchEngine implements ContentResearch {
       },
     ];
 
-    const result = await this.ai.structuredOutput<{
+    const { data: result } = await this.ai.structuredOutput<{
       name?: string;
       careerTrajectory: Array<{ company: string; role?: string; duration?: string; signals: string[] }>;
       skillSignatures: string[];
@@ -210,7 +210,7 @@ export class ContentResearchEngine implements ContentResearch {
       },
     ];
 
-    const result = await this.ai.structuredOutput<{
+    const { data: result } = await this.ai.structuredOutput<{
       careerTrajectory: Array<{ company: string; role?: string; duration?: string; signals: string[] }>;
       skillSignatures: string[];
       seniorityLevel?: string;
@@ -260,7 +260,7 @@ export class ContentResearchEngine implements ContentResearch {
       },
     ];
 
-    const result = await this.ai.structuredOutput<{
+    const { data: result } = await this.ai.structuredOutput<{
       name?: string;
       careerTrajectory: Array<{ company: string; role?: string; duration?: string; signals: string[] }>;
       skillSignatures: string[];

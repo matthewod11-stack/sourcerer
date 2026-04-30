@@ -2,21 +2,24 @@
 
 import { confirm } from '@inquirer/prompts';
 import type { DataSource, SearchConfig, CostEstimate } from '@sourcerer/core';
+import { estimatePerCandidateCost, AI_COST_PER_CANDIDATE_FALLBACK } from '@sourcerer/ai';
 
 export interface BudgetEstimate {
   total: number;
   perAdapter: Record<string, number>;
   aiEstimate: number;
+  /** Per-candidate AI cost used in the estimate (USD). Surfaced for tests + telemetry. */
+  aiPerCandidate: number;
+  /** The model used to look up pricing — `undefined` if the caller didn't pass one. */
+  aiModel?: string;
   currency: 'USD';
 }
-
-// AI scoring: ~$0.005 per LLM call, 2 calls per candidate (signal extraction + narrative)
-const AI_COST_PER_CANDIDATE = 0.01;
 
 export function estimateBudget(
   adapters: Record<string, DataSource | undefined>,
   searchConfig: SearchConfig,
   estimatedCandidateCount?: number,
+  aiModel?: string,
 ): BudgetEstimate {
   const perAdapter: Record<string, number> = {};
 
@@ -27,12 +30,17 @@ export function estimateBudget(
   }
 
   const candidateCount = estimatedCandidateCount ?? searchConfig.maxCandidates ?? 50;
-  const aiEstimate = candidateCount * AI_COST_PER_CANDIDATE;
+  // H-7: per-model pricing replaces the flat $0.01 constant. Falls back to the
+  // legacy constant when the model is unknown to the pricing table.
+  const aiPerCandidate = aiModel
+    ? (estimatePerCandidateCost(aiModel) || AI_COST_PER_CANDIDATE_FALLBACK)
+    : AI_COST_PER_CANDIDATE_FALLBACK;
+  const aiEstimate = candidateCount * aiPerCandidate;
 
   const adapterTotal = Object.values(perAdapter).reduce((sum, v) => sum + v, 0);
   const total = adapterTotal + aiEstimate;
 
-  return { total, perAdapter, aiEstimate, currency: 'USD' };
+  return { total, perAdapter, aiEstimate, aiPerCandidate, aiModel, currency: 'USD' };
 }
 
 export function formatBudgetEstimate(estimate: BudgetEstimate): string {

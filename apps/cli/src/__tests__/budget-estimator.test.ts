@@ -118,6 +118,7 @@ describe('formatBudgetEstimate', () => {
       total: 0.135,
       perAdapter: { exa: 0.025, github: 0, x: 0.01 },
       aiEstimate: 0.1,
+      aiPerCandidate: 0.01,
       currency: 'USD' as const,
     };
 
@@ -133,6 +134,7 @@ describe('formatBudgetEstimate', () => {
       total: 0.5,
       perAdapter: {},
       aiEstimate: 0.5,
+      aiPerCandidate: 0.01,
       currency: 'USD' as const,
     };
 
@@ -146,6 +148,7 @@ describe('formatBudgetEstimate', () => {
       total: 0.035,
       perAdapter: { exa: 0.025 },
       aiEstimate: 0.01,
+      aiPerCandidate: 0.01,
       currency: 'USD' as const,
     };
 
@@ -162,6 +165,7 @@ describe('formatBudgetEstimate', () => {
       total: 2.5,
       perAdapter: { exa: 1.5 },
       aiEstimate: 1.0,
+      aiPerCandidate: 0.02,
       currency: 'USD' as const,
     };
 
@@ -179,6 +183,7 @@ describe('confirmBudget', () => {
       total: 0.5,
       perAdapter: { exa: 0.025 },
       aiEstimate: 0.475,
+      aiPerCandidate: 0.0095,
       currency: 'USD' as const,
     };
 

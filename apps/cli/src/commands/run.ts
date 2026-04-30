@@ -17,7 +17,7 @@ import { GitHubAdapter } from '@sourcerer/adapter-github';
 import { XAdapter } from '@sourcerer/adapter-x';
 import { HunterAdapter } from '@sourcerer/adapter-hunter';
 import { resolveOutputAdapter } from '../adapter-registry.js';
-import { createAIProvider } from '@sourcerer/ai';
+import { createAIProvider, getDefaultModel } from '@sourcerer/ai';
 import { loadConfigFromDisk, configFileExists } from '../config-io.js';
 import {
   createDiscoverHandler,
@@ -209,11 +209,15 @@ export async function runCommand(args: string[]): Promise<void> {
     ? new HunterAdapter(hunterApiKey, undefined, undefined, retentionTtlDays)
     : undefined;
 
-  // Budget estimation
+  // Budget estimation — pass the effective AI model so the estimate uses
+  // per-model pricing (H-7) instead of a flat constant.
+  const aiModel =
+    sourcererConfig.aiProvider.model ?? getDefaultModel(sourcererConfig.aiProvider.name);
   const estimate = estimateBudget(
     { exa, github, x, hunter },
     searchConfig!,
     searchConfig?.maxCandidates,
+    aiModel,
   );
   const proceed = await confirmBudget(estimate, parsed.yes);
   if (!proceed) {

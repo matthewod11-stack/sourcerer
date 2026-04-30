@@ -6,9 +6,19 @@ import type {
   AIProvider,
   Message,
   ChatOptions,
+  ChatResult,
   StructuredOutputOptions,
+  StructuredOutputResult,
+  TokenUsage,
   IntakeContext,
 } from '@sourcerer/core';
+
+const ZERO_USAGE: TokenUsage = {
+  inputTokens: 0,
+  outputTokens: 0,
+  cachedTokens: 0,
+  model: 'mock',
+};
 import {
   createIntakeEngine,
   restoreIntakeEngine,
@@ -23,91 +33,92 @@ import {
 
 function createMockAIProvider(): AIProvider {
   let callCount = 0;
+
+  function pickStructuredData<T>(messages: Message[]): T {
+    callCount++;
+    const systemMsg = messages[0]?.content ?? '';
+
+    // Route based on what the system prompt asks for
+    if (systemMsg.includes('role') || systemMsg.includes('job')) {
+      return {
+        title: 'Senior Backend Engineer',
+        level: 'Senior',
+        scope: 'Backend infrastructure',
+        mustHaveSkills: ['Go', 'distributed systems'],
+        niceToHaveSkills: ['Rust'],
+      } as T;
+    }
+
+    if (systemMsg.includes('company') || systemMsg.includes('Company')) {
+      return {
+        name: 'TestCorp',
+        techStack: ['Go', 'PostgreSQL'],
+        teamSize: '10-50',
+        fundingStage: 'Series A',
+        productCategory: 'DeFi',
+        cultureSignals: ['remote-first'],
+        pitch: 'Building DeFi infrastructure',
+        competitors: ['Chainlink'],
+      } as T;
+    }
+
+    if (systemMsg.includes('talent') || systemMsg.includes('profile') || systemMsg.includes('team')) {
+      return {
+        careerTrajectory: [
+          { company: 'Stripe', role: 'Engineer', signals: ['payments'] },
+        ],
+        skillSignatures: ['Go', 'blockchain'],
+        seniorityLevel: 'senior',
+        cultureSignals: ['remote'],
+      } as T;
+    }
+
+    if (systemMsg.includes('anti-pattern') || systemMsg.includes('red flag')) {
+      return [] as unknown as T;
+    }
+
+    if (systemMsg.includes('search queries') || systemMsg.includes('tiered search')) {
+      return [
+        { priority: 1, queries: [{ text: 'senior backend engineer DeFi Go', maxResults: 10 }] },
+      ] as unknown as T;
+    }
+
+    if (systemMsg.includes('scoring weight') || systemMsg.includes('scoring strateg')) {
+      return {
+        technicalDepth: 0.3,
+        domainRelevance: 0.25,
+        trajectoryMatch: 0.2,
+        cultureFit: 0.15,
+        reachability: 0.1,
+      } as T;
+    }
+
+    return {
+      title: 'Engineer',
+      level: 'Senior',
+      scope: 'Engineering',
+      mustHaveSkills: [],
+      niceToHaveSkills: [],
+      careerTrajectory: [],
+      skillSignatures: [],
+      cultureSignals: [],
+      queries: [],
+      scoringWeights: {},
+      antiFilters: [],
+      result: 'ok',
+    } as T;
+  }
+
   return {
     name: 'mock',
-    async chat(_messages: Message[], _options?: ChatOptions): Promise<string> {
-      return 'Mock AI response';
+    async chat(_messages: Message[], _options?: ChatOptions): Promise<ChatResult> {
+      return { content: 'Mock AI response', usage: ZERO_USAGE };
     },
     async structuredOutput<T>(
       messages: Message[],
       _options: StructuredOutputOptions,
-    ): Promise<T> {
-      callCount++;
-      const systemMsg = messages[0]?.content ?? '';
-
-      // Route based on what the system prompt asks for
-      if (systemMsg.includes('role') || systemMsg.includes('job')) {
-        return {
-          title: 'Senior Backend Engineer',
-          level: 'Senior',
-          scope: 'Backend infrastructure',
-          mustHaveSkills: ['Go', 'distributed systems'],
-          niceToHaveSkills: ['Rust'],
-        } as T;
-      }
-
-      if (systemMsg.includes('company') || systemMsg.includes('Company')) {
-        return {
-          name: 'TestCorp',
-          techStack: ['Go', 'PostgreSQL'],
-          teamSize: '10-50',
-          fundingStage: 'Series A',
-          productCategory: 'DeFi',
-          cultureSignals: ['remote-first'],
-          pitch: 'Building DeFi infrastructure',
-          competitors: ['Chainlink'],
-        } as T;
-      }
-
-      if (systemMsg.includes('talent') || systemMsg.includes('profile') || systemMsg.includes('team')) {
-        return {
-          careerTrajectory: [
-            { company: 'Stripe', role: 'Engineer', signals: ['payments'] },
-          ],
-          skillSignatures: ['Go', 'blockchain'],
-          seniorityLevel: 'senior',
-          cultureSignals: ['remote'],
-        } as T;
-      }
-
-      // Anti-patterns parsing (expects string[])
-      if (systemMsg.includes('anti-pattern') || systemMsg.includes('red flag')) {
-        return [] as unknown as T;
-      }
-
-      // Search query generation (expects SearchQueryTier[])
-      if (systemMsg.includes('search queries') || systemMsg.includes('tiered search')) {
-        return [
-          { priority: 1, queries: [{ text: 'senior backend engineer DeFi Go', maxResults: 10 }] },
-        ] as unknown as T;
-      }
-
-      // Scoring weights (expects Record<string, number>)
-      if (systemMsg.includes('scoring weight') || systemMsg.includes('scoring strateg')) {
-        return {
-          technicalDepth: 0.3,
-          domainRelevance: 0.25,
-          trajectoryMatch: 0.2,
-          cultureFit: 0.15,
-          reachability: 0.1,
-        } as T;
-      }
-
-      // Default: return role-like data as safe fallback
-      return {
-        title: 'Engineer',
-        level: 'Senior',
-        scope: 'Engineering',
-        mustHaveSkills: [],
-        niceToHaveSkills: [],
-        careerTrajectory: [],
-        skillSignatures: [],
-        cultureSignals: [],
-        queries: [],
-        scoringWeights: {},
-        antiFilters: [],
-        result: 'ok',
-      } as T;
+    ): Promise<StructuredOutputResult<T>> {
+      return { data: pickStructuredData<T>(messages), usage: ZERO_USAGE };
     },
   };
 }
