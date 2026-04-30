@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { GitHubAdapter } from '../github-adapter.js';
+import { GitHubAdapter, selectTopRepos } from '../github-adapter.js';
 import {
   extractEmailsFromCommits,
   computeLanguageDistribution,
@@ -148,6 +148,76 @@ function makeCandidateWithEnrichment(
 }
 
 // --- Tests ---
+
+describe('selectTopRepos (H-10 stable sort)', () => {
+  type RepoFixture = Pick<
+    GitHubRepo,
+    'name' | 'stargazers_count' | 'fork'
+  > &
+    Partial<GitHubRepo>;
+
+  // LCG-based shuffle so test outcome is reproducible.
+  function deterministicShuffle<T>(arr: readonly T[], seed: number): T[] {
+    const a = [...arr];
+    let s = seed >>> 0;
+    for (let i = a.length - 1; i > 0; i--) {
+      s = ((s * 1103515245) + 12345) >>> 0;
+      const j = s % (i + 1);
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function makeRepo(name: string, stars: number, fork = false): RepoFixture {
+    return {
+      name,
+      stargazers_count: stars,
+      fork,
+      full_name: `u/${name}`,
+      language: null,
+      forks_count: 0,
+      topics: [],
+      updated_at: '2026-01-01T00:00:00Z',
+      pushed_at: '2026-01-01T00:00:00Z',
+      html_url: `https://github.com/u/${name}`,
+    };
+  }
+
+  it('produces identical top-3 selection across 100 shuffles when stars tie', () => {
+    // beta and charlie tie at 50; without a tiebreaker the API response order
+    // would decide which one lands in the top-3.
+    const repos: RepoFixture[] = [
+      makeRepo('alpha', 100),
+      makeRepo('beta', 50),
+      makeRepo('charlie', 50),
+      makeRepo('delta', 25),
+      makeRepo('echo', 10),
+    ];
+
+    const expected = selectTopRepos(repos as GitHubRepo[], 3).map((r) => r.name);
+    expect(expected).toEqual(['alpha', 'beta', 'charlie']);
+
+    for (let seed = 1; seed <= 100; seed++) {
+      const shuffled = deterministicShuffle(repos, seed);
+      const result = selectTopRepos(shuffled as GitHubRepo[], 3).map(
+        (r) => r.name,
+      );
+      expect(result).toEqual(expected);
+    }
+  });
+
+  it('excludes forks before applying tiebreaker', () => {
+    const repos: RepoFixture[] = [
+      makeRepo('a-fork', 200, true),
+      makeRepo('zebra', 100),
+      makeRepo('alpha', 50),
+      makeRepo('beta', 50),
+    ];
+
+    const result = selectTopRepos(repos as GitHubRepo[], 3).map((r) => r.name);
+    expect(result).toEqual(['zebra', 'alpha', 'beta']);
+  });
+});
 
 describe('Email extraction', () => {
   it('prefers personal email over company email', () => {

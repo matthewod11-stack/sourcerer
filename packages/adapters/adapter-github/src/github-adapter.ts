@@ -12,6 +12,7 @@ import type {
   CostEstimate,
 } from '@sourcerer/core';
 import { GitHubClient, GitHubApiError } from './github-client.js';
+import type { GitHubRepo } from './github-client.js';
 import {
   extractEmailsFromCommits,
   computeLanguageDistribution,
@@ -26,6 +27,25 @@ export interface EnrichBatchOptions {
 }
 
 const DEFAULT_STALE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+/**
+ * Pick the top-N non-fork repos by star count.
+ *
+ * Tiebreaker on equal stars is alphabetic by repo name (locale-aware). H-10:
+ * without the tiebreaker, two repos with equal stars would order by GitHub
+ * API response order, which isn't guaranteed stable across requests. That
+ * non-determinism propagated into commit-extracted emails and ultimately the
+ * canonicalId, breaking idempotency.
+ */
+export function selectTopRepos(repos: GitHubRepo[], n: number): GitHubRepo[] {
+  return repos
+    .filter((r) => !r.fork)
+    .sort(
+      (a, b) =>
+        b.stargazers_count - a.stargazers_count || a.name.localeCompare(b.name),
+    )
+    .slice(0, n);
+}
 
 export class GitHubAdapter implements DataSource {
   readonly name = 'github';
@@ -72,11 +92,10 @@ export class GitHubAdapter implements DataSource {
       await this.delay();
       const repos = await this.client.fetchRepos(username, 20);
 
-      // Fetch commits from top 3 repos by stars (for email extraction)
-      const topRepos = repos
-        .filter((r) => !r.fork)
-        .sort((a, b) => b.stargazers_count - a.stargazers_count)
-        .slice(0, 3);
+      // Fetch commits from top 3 repos by stars (for email extraction).
+      // selectTopRepos applies a stable name-based tiebreaker so canonicalId
+      // stays idempotent across runs (H-10).
+      const topRepos = selectTopRepos(repos, 3);
 
       let allCommits: Awaited<ReturnType<GitHubClient['fetchCommits']>> = [];
       for (const repo of topRepos) {
