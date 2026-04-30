@@ -1,47 +1,14 @@
 // Config system — types, validation, and defaults for ~/.sourcerer/config.yaml
+//
+// H-5: validation backed by a Zod schema (replaces ~70 lines of hand-rolled
+// type assertions). `validateConfig` keeps its public signature and the
+// `ConfigValidationError` class is unchanged; ZodError issues are mapped to
+// path-prefixed strings so existing test substrings ("adapters.exa",
+// "aiProvider.name", etc.) keep matching.
 
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-
-// --- Types ---
-
-export interface AdapterKeyConfig {
-  apiKey: string;
-}
-
-export interface GitHubAdapterConfig {
-  enabled: boolean;
-}
-
-export type AIProviderName = 'anthropic' | 'openai';
-export type OutputFormat = 'json' | 'csv' | 'markdown' | 'notion';
-
-export interface SourcererConfig {
-  version: 1;
-
-  adapters: {
-    exa: AdapterKeyConfig;
-    pearch?: AdapterKeyConfig;
-    github?: GitHubAdapterConfig;
-    x?: AdapterKeyConfig;
-    hunter?: AdapterKeyConfig;
-    contactout?: AdapterKeyConfig;
-    pdl?: AdapterKeyConfig;
-  };
-
-  aiProvider: {
-    name: AIProviderName;
-    apiKey: string;
-    model?: string;
-  };
-
-  retention: {
-    ttlDays: number;
-  };
-
-  defaultOutput?: OutputFormat;
-  maxCostUsd?: number;
-}
+import { z } from 'zod';
 
 // --- Constants ---
 
@@ -52,10 +19,11 @@ export const KNOWN_ADAPTERS = [
   'exa', 'pearch', 'github', 'x', 'hunter', 'contactout', 'pdl',
 ] as const;
 
-export const AI_PROVIDER_NAMES: readonly AIProviderName[] = ['anthropic', 'openai'];
+export const AI_PROVIDER_NAMES = ['anthropic', 'openai'] as const;
+export type AIProviderName = (typeof AI_PROVIDER_NAMES)[number];
 
 export const DEFAULT_RETENTION_TTL_DAYS = 90;
-export const DEFAULT_OUTPUT_FORMAT: OutputFormat = 'json';
+export const DEFAULT_OUTPUT_FORMAT = 'json' as const;
 
 // --- Validation Error ---
 
@@ -69,98 +37,84 @@ export class ConfigValidationError extends Error {
   }
 }
 
+// --- Schema ---
+
+// `apiKey` must be a non-empty, non-whitespace string. Refine instead of
+// .min(1) so "  " (whitespace-only) is also rejected, matching the pre-Zod
+// behavior.
+const ApiKeyString = z
+  .string()
+  .refine((s) => s.trim().length > 0, {
+    message: 'apiKey must be a non-empty string',
+  });
+
+const AdapterKeyConfigSchema = z.object({ apiKey: ApiKeyString });
+const GitHubAdapterConfigSchema = z.object({ enabled: z.boolean() });
+
+const AIProviderNameSchema = z.enum(AI_PROVIDER_NAMES, {
+  errorMap: (issue, ctx) => {
+    if (issue.code === 'invalid_enum_value') {
+      return {
+        message: `must be one of: ${AI_PROVIDER_NAMES.join(', ')} (got: "${String(ctx.data)}")`,
+      };
+    }
+    return { message: ctx.defaultError };
+  },
+});
+
+const OutputFormatSchema = z.enum(['json', 'csv', 'markdown', 'notion']);
+
+export const SourcererConfigSchema = z.object({
+  version: z.literal(1).default(1),
+
+  adapters: z.object({
+    exa: AdapterKeyConfigSchema,
+    pearch: AdapterKeyConfigSchema.optional(),
+    github: GitHubAdapterConfigSchema.default({ enabled: true }),
+    x: AdapterKeyConfigSchema.optional(),
+    hunter: AdapterKeyConfigSchema.optional(),
+    contactout: AdapterKeyConfigSchema.optional(),
+    pdl: AdapterKeyConfigSchema.optional(),
+  }),
+
+  aiProvider: z.object({
+    name: AIProviderNameSchema,
+    apiKey: ApiKeyString,
+    model: z.string().optional(),
+  }),
+
+  retention: z
+    .object({
+      ttlDays: z
+        .number()
+        .positive('ttlDays must be a positive number')
+        .default(DEFAULT_RETENTION_TTL_DAYS),
+    })
+    .default({ ttlDays: DEFAULT_RETENTION_TTL_DAYS }),
+
+  defaultOutput: OutputFormatSchema.default(DEFAULT_OUTPUT_FORMAT),
+  maxCostUsd: z.number().optional(),
+});
+
+// --- Public types (inferred from schema) ---
+
+export type AdapterKeyConfig = z.infer<typeof AdapterKeyConfigSchema>;
+export type GitHubAdapterConfig = z.infer<typeof GitHubAdapterConfigSchema>;
+export type OutputFormat = z.infer<typeof OutputFormatSchema>;
+export type SourcererConfig = z.infer<typeof SourcererConfigSchema>;
+
 // --- Validation ---
 
 export function validateConfig(raw: unknown): SourcererConfig {
-  const errors: string[] = [];
+  const result = SourcererConfigSchema.safeParse(raw);
+  if (result.success) return result.data;
 
-  if (raw === null || raw === undefined || typeof raw !== 'object') {
-    throw new ConfigValidationError(['Config must be a non-null object']);
-  }
-
-  const obj = raw as Record<string, unknown>;
-
-  // Version
-  if (obj.version !== undefined && obj.version !== 1) {
-    errors.push(`Unsupported config version: ${String(obj.version)}. Expected 1.`);
-  }
-
-  // Adapters
-  if (!obj.adapters || typeof obj.adapters !== 'object') {
-    errors.push('Missing required field: adapters');
-  } else {
-    const adapters = obj.adapters as Record<string, unknown>;
-
-    // Exa is required
-    if (!adapters.exa || typeof adapters.exa !== 'object') {
-      errors.push('Missing required field: adapters.exa');
-    } else {
-      const exa = adapters.exa as Record<string, unknown>;
-      if (!exa.apiKey || typeof exa.apiKey !== 'string' || exa.apiKey.trim() === '') {
-        errors.push('adapters.exa.apiKey must be a non-empty string');
-      }
-    }
-
-    // Validate optional adapter keys
-    for (const name of ['pearch', 'x', 'hunter', 'contactout', 'pdl'] as const) {
-      if (adapters[name] && typeof adapters[name] === 'object') {
-        const adapter = adapters[name] as Record<string, unknown>;
-        if ('apiKey' in adapter && (typeof adapter.apiKey !== 'string' || adapter.apiKey.trim() === '')) {
-          errors.push(`adapters.${name}.apiKey must be a non-empty string`);
-        }
-      }
-    }
-  }
-
-  // AI Provider
-  if (!obj.aiProvider || typeof obj.aiProvider !== 'object') {
-    errors.push('Missing required field: aiProvider');
-  } else {
-    const ai = obj.aiProvider as Record<string, unknown>;
-    if (!ai.name || !AI_PROVIDER_NAMES.includes(ai.name as AIProviderName)) {
-      errors.push(
-        `aiProvider.name must be one of: ${AI_PROVIDER_NAMES.join(', ')}` +
-        (ai.name ? ` (got: "${String(ai.name)}")` : ''),
-      );
-    }
-    if (!ai.apiKey || typeof ai.apiKey !== 'string' || ai.apiKey.trim() === '') {
-      errors.push('aiProvider.apiKey must be a non-empty string');
-    }
-  }
-
-  // Retention
-  if (obj.retention && typeof obj.retention === 'object') {
-    const ret = obj.retention as Record<string, unknown>;
-    if (ret.ttlDays !== undefined && (typeof ret.ttlDays !== 'number' || ret.ttlDays <= 0)) {
-      errors.push('retention.ttlDays must be a positive number');
-    }
-  }
-
-  if (errors.length > 0) {
-    throw new ConfigValidationError(errors);
-  }
-
-  return applyDefaults(obj as Partial<SourcererConfig>);
-}
-
-// --- Defaults ---
-
-export function applyDefaults(partial: Partial<SourcererConfig>): SourcererConfig {
-  const adapters = (partial.adapters ?? {}) as SourcererConfig['adapters'];
-
-  return {
-    version: 1,
-    adapters: {
-      ...adapters,
-      github: adapters.github ?? { enabled: true },
-    },
-    aiProvider: partial.aiProvider!,
-    retention: {
-      ttlDays: partial.retention?.ttlDays ?? DEFAULT_RETENTION_TTL_DAYS,
-    },
-    defaultOutput: partial.defaultOutput ?? DEFAULT_OUTPUT_FORMAT,
-    maxCostUsd: partial.maxCostUsd,
-  };
+  const messages = result.error.issues.map((issue) =>
+    issue.path.length > 0
+      ? `${issue.path.join('.')}: ${issue.message}`
+      : issue.message,
+  );
+  throw new ConfigValidationError(messages);
 }
 
 // --- Utilities ---

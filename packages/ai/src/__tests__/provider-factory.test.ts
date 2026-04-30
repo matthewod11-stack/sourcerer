@@ -31,6 +31,7 @@ function makeConfig(overrides: Partial<SourcererConfig['aiProvider']> = {}): Sou
     version: 1,
     adapters: {
       exa: { apiKey: 'test-exa-key' },
+      github: { enabled: true },
     },
     aiProvider: {
       name: 'anthropic',

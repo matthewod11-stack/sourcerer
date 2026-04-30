@@ -1,12 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   validateConfig,
-  applyDefaults,
   getConfiguredAdapters,
   getAdapterApiKey,
   ConfigValidationError,
   DEFAULT_RETENTION_TTL_DAYS,
-  type SourcererConfig,
 } from '../config.js';
 
 // --- Factories ---
@@ -149,31 +147,46 @@ describe('Config validation', () => {
       raw.retention = { ttlDays: -5 };
       expect(() => validateConfig(raw)).toThrow('retention.ttlDays');
     });
+
+    it('produces Zod-style path-prefixed error messages', () => {
+      const raw = {
+        version: 1,
+        adapters: { exa: { apiKey: '' } },
+        aiProvider: { name: 'anthropic', apiKey: 'k' },
+      };
+      try {
+        validateConfig(raw);
+        expect.fail('should have thrown');
+      } catch (e) {
+        expect(e).toBeInstanceOf(ConfigValidationError);
+        const err = e as ConfigValidationError;
+        // Each error string starts with the field path joined by '.', then ': '
+        expect(err.errors[0]).toMatch(/^adapters\.exa\.apiKey: /);
+      }
+    });
   });
 });
 
-describe('applyDefaults', () => {
-  it('sets retention.ttlDays to 90 when missing', () => {
-    const config = applyDefaults({
+describe('validateConfig defaults', () => {
+  function rawWithMinimalFields(): Record<string, unknown> {
+    return {
       adapters: { exa: { apiKey: 'k' } },
       aiProvider: { name: 'anthropic', apiKey: 'k' },
-    } as Partial<SourcererConfig>);
+    };
+  }
+
+  it('sets retention.ttlDays to 90 when missing', () => {
+    const config = validateConfig(rawWithMinimalFields());
     expect(config.retention.ttlDays).toBe(90);
   });
 
   it('enables github by default', () => {
-    const config = applyDefaults({
-      adapters: { exa: { apiKey: 'k' } },
-      aiProvider: { name: 'anthropic', apiKey: 'k' },
-    } as Partial<SourcererConfig>);
+    const config = validateConfig(rawWithMinimalFields());
     expect(config.adapters.github?.enabled).toBe(true);
   });
 
   it('defaults output format to json', () => {
-    const config = applyDefaults({
-      adapters: { exa: { apiKey: 'k' } },
-      aiProvider: { name: 'anthropic', apiKey: 'k' },
-    } as Partial<SourcererConfig>);
+    const config = validateConfig(rawWithMinimalFields());
     expect(config.defaultOutput).toBe('json');
   });
 });

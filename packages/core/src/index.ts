@@ -125,8 +125,8 @@ export {
   DEFAULT_RETENTION_TTL_DAYS,
   DEFAULT_OUTPUT_FORMAT,
   ConfigValidationError,
+  SourcererConfigSchema,
   validateConfig,
-  applyDefaults,
   getConfiguredAdapters,
   getAdapterApiKey,
 } from './config.js';
