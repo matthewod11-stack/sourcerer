@@ -32,6 +32,7 @@ export type {
   ScoredCandidate,
   EnrichmentResult,
 } from './candidate.js';
+export { computeRetentionExpiresAt } from './candidate.js';
 
 // Pipeline
 export type {

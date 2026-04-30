@@ -26,8 +26,15 @@ export class HunterAdapter implements DataSource {
   private client: HunterClient;
   private delayMs: number;
   private costPerSearch: number;
+  /** PII retention window in days; forwarded into PIIField.retentionExpiresAt. H-2. */
+  private retentionTtlDays?: number;
 
-  constructor(apiKey: string, rateLimits?: Partial<RateLimitConfig>, costPerSearch = 0.03) {
+  constructor(
+    apiKey: string,
+    rateLimits?: Partial<RateLimitConfig>,
+    costPerSearch = 0.03,
+    retentionTtlDays?: number,
+  ) {
     this.client = new HunterClient(apiKey);
     this.rateLimits = {
       requestsPerSecond: 0.5,
@@ -35,6 +42,7 @@ export class HunterAdapter implements DataSource {
     };
     this.delayMs = 1000 / (this.rateLimits.requestsPerSecond ?? 0.5);
     this.costPerSearch = costPerSearch;
+    this.retentionTtlDays = retentionTtlDays;
   }
 
   async *search(_config: SearchConfig): AsyncGenerator<SearchPage> {
@@ -65,7 +73,7 @@ export class HunterAdapter implements DataSource {
 
       const candidateUrl = `https://hunter.io/find/${domain}`;
       let evidence = buildEmailEvidence(emailResult, candidateUrl);
-      const piiFields = buildPiiFields(emailResult, now);
+      const piiFields = buildPiiFields(emailResult, now, this.retentionTtlDays);
 
       // Verify the found email
       try {

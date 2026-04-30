@@ -26,14 +26,21 @@ export class ExaAdapter implements DataSource {
 
   private client: InstanceType<typeof Exa>;
   private limiter: RateLimiter;
+  /** PII retention window in days; forwarded into PIIField.retentionExpiresAt. H-2. */
+  private retentionTtlDays?: number;
 
-  constructor(apiKey: string, rateLimits?: Partial<RateLimitConfig>) {
+  constructor(
+    apiKey: string,
+    rateLimits?: Partial<RateLimitConfig>,
+    retentionTtlDays?: number,
+  ) {
     this.client = new Exa(apiKey);
     this.rateLimits = {
       requestsPerSecond: 1,
       ...rateLimits,
     };
     this.limiter = new RateLimiter(this.rateLimits.requestsPerSecond ?? 1);
+    this.retentionTtlDays = retentionTtlDays;
   }
 
   async *search(config: SearchConfig): AsyncGenerator<SearchPage> {
@@ -72,7 +79,7 @@ export class ExaAdapter implements DataSource {
           });
 
           const candidates = response.results.map((r: unknown) =>
-            parseExaResult(r as ExaResult, query.text),
+            parseExaResult(r as ExaResult, query.text, undefined, this.retentionTtlDays),
           );
 
           const costIncurred = response.costDollars?.total ?? numResults * COST_PER_SEARCH_ESTIMATE;
@@ -107,7 +114,7 @@ export class ExaAdapter implements DataSource {
         });
 
         const candidates = response.results.map((r: unknown) =>
-          parseExaResult(r as ExaResult, '', url),
+          parseExaResult(r as ExaResult, '', url, this.retentionTtlDays),
         );
 
         const costIncurred = response.costDollars?.total ?? DEFAULT_NUM_RESULTS * COST_PER_SEARCH_ESTIMATE;

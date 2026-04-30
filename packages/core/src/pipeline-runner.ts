@@ -108,6 +108,7 @@ export class PipelineRunner {
       talentProfile: config.talentProfile ?? phaseOutputs.intake?.talentProfile,
       phaseOutputs,
       costSnapshot: costTracker.snapshot(),
+      retentionTtlDays: config.retentionTtlDays,
       onProgress: config.onProgress,
     };
 

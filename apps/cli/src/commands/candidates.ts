@@ -11,6 +11,9 @@ import {
   writeCandidates,
   listAllRuns,
 } from '../run-loader.js';
+import { backfillRunRetention } from '../retention-migration.js';
+import { configFileExists, loadConfigFromDisk } from '../config-io.js';
+import { DEFAULT_RETENTION_TTL_DAYS } from '@sourcerer/core';
 
 interface ParsedCandidatesArgs {
   subcommand: 'delete' | 'purge' | null;
@@ -150,6 +153,20 @@ async function handlePurge(parsed: ParsedCandidatesArgs): Promise<void> {
     return;
   }
 
+  // H-2 migration: legacy runs (pre-this-commit) may have PIIField records
+  // without `retentionExpiresAt`. Without the backfill below, those fields
+  // would be ignored by the comparison and live forever. Resolve TTL from
+  // config, falling back to the package default if no config is present.
+  let retentionTtlDays = DEFAULT_RETENTION_TTL_DAYS;
+  try {
+    if (await configFileExists()) {
+      const config = await loadConfigFromDisk();
+      retentionTtlDays = config.retention.ttlDays;
+    }
+  } catch {
+    // Bad/missing config — fall back to default rather than blocking purge.
+  }
+
   const now = new Date().toISOString();
   let totalFieldsRedacted = 0;
   let candidatesAffected = 0;
@@ -163,13 +180,24 @@ async function handlePurge(parsed: ParsedCandidatesArgs): Promise<void> {
       continue;
     }
 
-    let runModified = false;
+    // B2 policy: backfill legacy fields using collectedAt + ttlDays. If a
+    // legacy field has no usable collectedAt, it gets stamped expired-now,
+    // so the redaction loop below will catch it on this same pass.
+    const migrated = backfillRunRetention(
+      candidates,
+      run.meta,
+      'collected-at',
+      retentionTtlDays,
+    );
+
+    let runModified = migrated;
     for (const candidate of candidates) {
       let candidateModified = false;
       for (const field of candidate.pii.fields) {
         if (
           field.retentionExpiresAt &&
-          field.retentionExpiresAt < now
+          field.retentionExpiresAt < now &&
+          field.value !== '[REDACTED]'
         ) {
           field.value = '[REDACTED]';
           totalFieldsRedacted++;

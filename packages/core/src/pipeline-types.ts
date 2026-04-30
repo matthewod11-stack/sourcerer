@@ -131,6 +131,12 @@ export interface PipelineContext {
   talentProfile?: TalentProfile;
   phaseOutputs: Partial<PhaseOutputMap>;
   costSnapshot: CostSnapshot;
+  /**
+   * Days that PII collected during this run may be retained before becoming
+   * eligible for redaction by `sourcerer candidates purge --expired`.
+   * Sourced from `config.retention.ttlDays` (default 90). H-2.
+   */
+  retentionTtlDays?: number;
   onProgress?: (event: ProgressEvent) => void;
 }
 
@@ -145,6 +151,8 @@ export interface PipelineRunConfig {
   startFromPhase?: PipelinePhaseName;
   outputConfig?: OutputConfig;
   maxCostUsd?: number;
+  /** PII retention window in days. Forwarded to adapters via PipelineContext. H-2. */
+  retentionTtlDays?: number;
   onProgress?: (event: ProgressEvent) => void;
 }
 

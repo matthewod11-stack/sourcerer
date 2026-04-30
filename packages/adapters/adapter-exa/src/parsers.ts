@@ -1,6 +1,7 @@
 // Parse Exa search results into Sourcerer types
 
 import {
+  computeRetentionExpiresAt,
   generateEvidenceId,
   type RawCandidate,
   type ObservedIdentifier,
@@ -128,10 +129,17 @@ export function parseExaResult(
   result: ExaResult,
   queryContext: string,
   similaritySeedUrl?: string,
+  /**
+   * Optional retention TTL in days. When provided, every PIIField produced
+   * here is stamped with `retentionExpiresAt = now + ttlDays`. H-2.
+   */
+  retentionTtlDays?: number,
 ): RawCandidate {
   const now = new Date().toISOString();
   const text = result.text ?? '';
   const title = result.title ?? '';
+  const retentionExpiresAt =
+    retentionTtlDays !== undefined ? computeRetentionExpiresAt(now, retentionTtlDays) : undefined;
 
   // Extract name heuristic: prefer author, then title (if it looks like a name)
   const name = extractName(result.author, title, result.url);
@@ -178,6 +186,7 @@ export function parseExaResult(
     type: 'email' as const,
     adapter: 'exa',
     collectedAt: now,
+    retentionExpiresAt,
   }));
 
   // Source data

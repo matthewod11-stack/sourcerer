@@ -78,3 +78,36 @@ export interface EnrichmentResult {
   sourceData: SourceData;
   enrichedAt: string;
 }
+
+// --- Retention Helpers ---
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * Compute the retention expiry timestamp for a PII field.
+ *
+ * H-2: every PIIField MUST set retentionExpiresAt at collection time so that
+ * `sourcerer candidates purge --expired` actually purges anything. Without this
+ * helper, parsers tend to produce PIIField objects with collectedAt but no
+ * retentionExpiresAt, making the purge command a no-op.
+ *
+ * @param collectedAt ISO-8601 timestamp of when the PII was collected.
+ * @param ttlDays Number of days the PII may be retained. Pass `config.retention.ttlDays`.
+ * @returns ISO-8601 timestamp at which the PII becomes eligible for redaction.
+ * @throws If `collectedAt` is not a valid ISO-8601 timestamp, or `ttlDays` is negative.
+ */
+export function computeRetentionExpiresAt(collectedAt: string, ttlDays: number): string {
+  const baseMs = new Date(collectedAt).getTime();
+  if (!Number.isFinite(baseMs)) {
+    throw new Error(
+      `computeRetentionExpiresAt: collectedAt is not a valid ISO-8601 timestamp: ${String(collectedAt)}`,
+    );
+  }
+  if (ttlDays < 0) {
+    throw new Error(
+      `computeRetentionExpiresAt: ttlDays must be non-negative (got ${ttlDays}). ` +
+        'A negative TTL would make PII expire before it was collected.',
+    );
+  }
+  return new Date(baseMs + ttlDays * MS_PER_DAY).toISOString();
+}

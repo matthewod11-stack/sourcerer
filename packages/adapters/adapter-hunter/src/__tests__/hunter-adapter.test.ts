@@ -418,6 +418,35 @@ describe('Parsers', () => {
       expect(fields[0].adapter).toBe('hunter');
       expect(fields[0].collectedAt).toBe(now);
     });
+
+    it('omits retentionExpiresAt when no ttlDays is supplied', () => {
+      const now = '2026-03-25T12:00:00Z';
+      const fields = buildPiiFields(mockEmailResult, now);
+      expect(fields[0].retentionExpiresAt).toBeUndefined();
+    });
+
+    // H-2: parsers must stamp retentionExpiresAt at collection time when a
+    // ttlDays is threaded through, so that `candidates purge --expired` is
+    // not a no-op for newly collected PII.
+    it('stamps retentionExpiresAt ~30 days out when ttlDays=30', () => {
+      const now = '2026-03-25T12:00:00.000Z';
+      const fields = buildPiiFields(mockEmailResult, now, 30);
+
+      expect(fields[0].retentionExpiresAt).toBeDefined();
+      const collectedMs = new Date(fields[0].collectedAt).getTime();
+      const expiryMs = new Date(fields[0].retentionExpiresAt!).getTime();
+      const dayMs = 24 * 60 * 60 * 1000;
+      expect(expiryMs - collectedMs).toBe(30 * dayMs);
+    });
+
+    it('uses the same now snapshot for both collectedAt and retentionExpiresAt', () => {
+      const now = '2026-04-30T07:00:00.000Z';
+      const fields = buildPiiFields(mockEmailResult, now, 90);
+      // collectedAt MUST equal the `now` we passed in, and expiresAt must
+      // derive from that exact same instant — no clock drift between fields.
+      expect(fields[0].collectedAt).toBe(now);
+      expect(fields[0].retentionExpiresAt).toBe('2026-07-29T07:00:00.000Z');
+    });
   });
 
   describe('buildEmailEvidence()', () => {

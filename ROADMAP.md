@@ -1,6 +1,6 @@
 # Sourcerer — Roadmap
 
-> **Last updated:** 2026-04-16
+> **Last updated:** 2026-04-30
 > **Active workstream:** Hardening (audit-driven — see [`docs/hardening-roadmap-2026-04-16.md`](docs/hardening-roadmap-2026-04-16.md))
 > **Paused workstream:** V1 product backlog — Phase 7.2 / 7.5 / 7.6 / 7.7 (see [`docs/roadmap.md`](docs/roadmap.md))
 
@@ -14,7 +14,7 @@ Full item specs (Problem, Fix, Files, Acceptance, Effort) live in [`docs/hardeni
 
 ### Phase 1 — Security & Privacy (parallel-safe)
 - [x] [**H-1** #5](https://github.com/matthewod11-stack/sourcerer/issues/5) Sandbox external content in LLM prompts — M — no deps ✅ 2026-04-19
-- [ ] [**H-2** #6](https://github.com/matthewod11-stack/sourcerer/issues/6) Populate `retentionExpiresAt` at PII collection time — M — no deps
+- [x] [**H-2** #6](https://github.com/matthewod11-stack/sourcerer/issues/6) Populate `retentionExpiresAt` at PII collection time — M — no deps ✅ 2026-04-30
 - [ ] [**H-3** #7](https://github.com/matthewod11-stack/sourcerer/issues/7) Stop logging raw PII to stdout — S — no deps
 
 ### Phase 2 — Model defaults, Zod config, determinism (parallel-safe)

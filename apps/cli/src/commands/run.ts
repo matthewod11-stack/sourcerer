@@ -191,17 +191,23 @@ export async function runCommand(args: string[]): Promise<void> {
     }
   }
 
+  // PII retention TTL — forwarded into adapters so every PIIField is stamped with
+  // retentionExpiresAt at collection time. H-2: makes `candidates purge --expired` real.
+  const retentionTtlDays = sourcererConfig.retention.ttlDays;
+
   // Instantiate adapters
-  const exa = new ExaAdapter(sourcererConfig.adapters.exa.apiKey);
+  const exa = new ExaAdapter(sourcererConfig.adapters.exa.apiKey, undefined, retentionTtlDays);
 
   const githubToken = process.env.GITHUB_TOKEN;
-  const github = new GitHubAdapter(githubToken);
+  const github = new GitHubAdapter(githubToken, undefined, retentionTtlDays);
 
   const xApiKey = getAdapterApiKey(sourcererConfig, 'x');
   const x = xApiKey ? new XAdapter(xApiKey) : undefined;
 
   const hunterApiKey = getAdapterApiKey(sourcererConfig, 'hunter');
-  const hunter = hunterApiKey ? new HunterAdapter(hunterApiKey) : undefined;
+  const hunter = hunterApiKey
+    ? new HunterAdapter(hunterApiKey, undefined, undefined, retentionTtlDays)
+    : undefined;
 
   // Budget estimation
   const estimate = estimateBudget(
@@ -256,6 +262,7 @@ export async function runCommand(args: string[]): Promise<void> {
     talentProfile,
     resumeFrom: parsed.resumeFrom,
     maxCostUsd: searchConfig?.maxCostUsd,
+    retentionTtlDays,
     onProgress: parsed.quiet ? undefined : (event) => {
       const icon =
         event.status === 'completed'

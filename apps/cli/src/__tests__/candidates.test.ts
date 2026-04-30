@@ -244,7 +244,7 @@ describe('candidatesCommand — delete', () => {
 });
 
 describe('candidatesCommand — purge', () => {
-  it('redacts expired PII fields', async () => {
+  it('redacts expired PII fields (current-format records with retentionExpiresAt)', async () => {
     const runsDir = join(testDir, 'runs');
     const expiredPII: PIIField = {
       value: 'alice@secret.com',
@@ -260,12 +260,15 @@ describe('candidatesCommand — purge', () => {
       collectedAt: '2026-01-01T00:00:00Z',
       retentionExpiresAt: '2099-12-31T23:59:59Z', // far in the future
     };
-    const noPII: PIIField = {
+    // Recent legacy field — collectedAt is recent enough that B2 backfill
+    // (collectedAt + 90d default TTL) lands in the future, so it must NOT
+    // be redacted.
+    const recentLegacyPII: PIIField = {
       value: 'carol@nope.com',
       type: 'email',
       adapter: 'hunter',
-      collectedAt: '2026-01-01T00:00:00Z',
-      // no retentionExpiresAt — should not be redacted
+      collectedAt: '2099-01-01T00:00:00Z',
+      // no retentionExpiresAt — backfilled by B2 migration
     };
 
     await createRun(
@@ -274,7 +277,7 @@ describe('candidatesCommand — purge', () => {
       [
         makeMinimalCandidate('c1', 'Alice', 1, 90, [expiredPII]),
         makeMinimalCandidate('c2', 'Bob', 2, 70, [validPII]),
-        makeMinimalCandidate('c3', 'Carol', 2, 60, [noPII]),
+        makeMinimalCandidate('c3', 'Carol', 2, 60, [recentLegacyPII]),
       ],
       { startedAt: '2026-04-06T10:00:00Z' },
     );
@@ -300,8 +303,119 @@ describe('candidatesCommand — purge', () => {
     const bob = candidates.find((c) => c.id === 'c2')!;
     expect(bob.pii.fields[0].value).toBe('bob@public.com');
 
+    // Carol's legacy field gets a backfilled retentionExpiresAt in the future
+    // (collectedAt 2099 + 90d), so it should NOT be redacted.
     const carol = candidates.find((c) => c.id === 'c3')!;
     expect(carol.pii.fields[0].value).toBe('carol@nope.com');
+    expect(carol.pii.fields[0].retentionExpiresAt).toBeDefined();
+  });
+
+  // H-2 / B2 — legacy run migration semantics
+  // Pre-H-2 runs have PIIField records with `collectedAt` but no
+  // `retentionExpiresAt`. The B2 policy: backfill expiresAt = collectedAt +
+  // ttlDays, falling back to expired-now if collectedAt is missing/bad.
+  describe('H-2 legacy backfill (B2 policy)', () => {
+    it('redacts a 91-day-old legacy PII record on first purge after H-2', async () => {
+      const runsDir = join(testDir, 'runs');
+      // Today is anchored well past 2026-01-01 + default 90 days. With B2,
+      // the migration stamps retentionExpiresAt = 2026-04-01, which is < now
+      // → field gets redacted on this same purge invocation.
+      const legacyExpiredPII: PIIField = {
+        value: 'oldlegacy@example.com',
+        type: 'email',
+        adapter: 'hunter',
+        collectedAt: '2026-01-01T00:00:00Z',
+        // no retentionExpiresAt — pre-H-2 format
+      };
+
+      await createRun(
+        runsDir,
+        '2026-01-01-legacy-run',
+        [makeMinimalCandidate('legacy-1', 'OldUser', 2, 70, [legacyExpiredPII])],
+        { startedAt: '2026-01-01T10:00:00Z' },
+      );
+
+      const { output, restore } = captureConsole();
+      try {
+        await candidatesCommand(['purge', '--expired', '--runs-dir', runsDir]);
+      } finally {
+        restore();
+      }
+
+      expect(output.join('\n')).toContain('Purged 1 PII field');
+
+      const reloaded = await loadCandidates(join(runsDir, '2026-01-01-legacy-run'));
+      expect(reloaded[0].pii.fields[0].value).toBe('[REDACTED]');
+      // Backfill stamped a retentionExpiresAt — and it's in the past.
+      expect(reloaded[0].pii.fields[0].retentionExpiresAt).toBeDefined();
+    });
+
+    it('redacts a legacy PII record with no collectedAt (expired-now fallback)', async () => {
+      const runsDir = join(testDir, 'runs');
+      // Corrupt/old field with neither retentionExpiresAt nor collectedAt.
+      // B2 fallback: stamp expired-now (1970) → redacted on this pass.
+      const corruptLegacyPII = {
+        value: 'corrupt@example.com',
+        type: 'email' as const,
+        adapter: 'hunter',
+        // missing both collectedAt and retentionExpiresAt
+      } as unknown as PIIField;
+
+      await createRun(
+        runsDir,
+        '2026-01-01-corrupt-run',
+        [makeMinimalCandidate('corrupt-1', 'Corrupt', 2, 70, [corruptLegacyPII])],
+        { startedAt: '2026-01-01T10:00:00Z' },
+      );
+
+      const { output, restore } = captureConsole();
+      try {
+        await candidatesCommand(['purge', '--expired', '--runs-dir', runsDir]);
+      } finally {
+        restore();
+      }
+
+      expect(output.join('\n')).toContain('Purged 1 PII field');
+
+      const reloaded = await loadCandidates(join(runsDir, '2026-01-01-corrupt-run'));
+      expect(reloaded[0].pii.fields[0].value).toBe('[REDACTED]');
+    });
+
+    it('persists the backfilled retentionExpiresAt to disk so subsequent loads see it', async () => {
+      const runsDir = join(testDir, 'runs');
+      const legacyPII: PIIField = {
+        value: 'legacy-stamped@example.com',
+        type: 'email',
+        adapter: 'hunter',
+        collectedAt: '2099-06-01T00:00:00Z', // future, so NOT redacted
+      };
+
+      await createRun(
+        runsDir,
+        '2099-run',
+        [makeMinimalCandidate('p-1', 'Future', 2, 70, [legacyPII])],
+        { startedAt: '2099-06-01T10:00:00Z' },
+      );
+
+      const { restore } = captureConsole();
+      try {
+        await candidatesCommand(['purge', '--expired', '--runs-dir', runsDir]);
+      } finally {
+        restore();
+      }
+
+      // After purge, the candidates.json should have been rewritten with the
+      // backfilled retentionExpiresAt — even though no field was redacted.
+      const reloaded = await loadCandidates(join(runsDir, '2099-run'));
+      const stamped = reloaded[0].pii.fields[0];
+      expect(stamped.value).toBe('legacy-stamped@example.com');
+      expect(stamped.retentionExpiresAt).toBeDefined();
+      // Expiry should be ~90 days after collectedAt (default TTL) — far past
+      // the legacy collected timestamp, so still in the future for "now".
+      expect(new Date(stamped.retentionExpiresAt!).getTime()).toBeGreaterThan(
+        new Date(stamped.collectedAt).getTime(),
+      );
+    });
   });
 
   it('leaves non-expired PII untouched', async () => {

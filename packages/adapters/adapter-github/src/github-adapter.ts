@@ -34,8 +34,14 @@ export class GitHubAdapter implements DataSource {
 
   private client: GitHubClient;
   private delayMs: number;
+  /** PII retention window in days; forwarded into PIIField.retentionExpiresAt. H-2. */
+  private retentionTtlDays?: number;
 
-  constructor(token?: string, rateLimits?: Partial<RateLimitConfig>) {
+  constructor(
+    token?: string,
+    rateLimits?: Partial<RateLimitConfig>,
+    retentionTtlDays?: number,
+  ) {
     this.client = new GitHubClient(token);
     this.rateLimits = {
       requestsPerSecond: token ? 1.4 : 0.5,
@@ -43,6 +49,7 @@ export class GitHubAdapter implements DataSource {
       ...rateLimits,
     };
     this.delayMs = 1000 / (this.rateLimits.requestsPerSecond ?? 1);
+    this.retentionTtlDays = retentionTtlDays;
   }
 
   async *search(_config: SearchConfig): AsyncGenerator<SearchPage> {
@@ -99,6 +106,7 @@ export class GitHubAdapter implements DataSource {
         languages,
         emails,
         allCommits.length,
+        this.retentionTtlDays,
       );
 
       // Add contribution trend evidence

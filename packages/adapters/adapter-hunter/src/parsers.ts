@@ -1,6 +1,7 @@
 // Parse Hunter.io API responses into Sourcerer evidence and PII types
 
 import {
+  computeRetentionExpiresAt,
   generateEvidenceId,
   type EvidenceItem,
   type PIIField,
@@ -104,9 +105,18 @@ export function buildVerificationEvidence(
 /**
  * Build PII fields from a Hunter email result.
  * Each found email becomes a PIIField with type 'email' and adapter 'hunter'.
+ *
+ * @param retentionTtlDays Optional retention window in days. When provided,
+ * each PIIField is stamped with `retentionExpiresAt = now + ttlDays`. H-2.
  */
-export function buildPiiFields(emailResult: HunterEmailResult, now: string): PIIField[] {
+export function buildPiiFields(
+  emailResult: HunterEmailResult,
+  now: string,
+  retentionTtlDays?: number,
+): PIIField[] {
   const piiFields: PIIField[] = [];
+  const retentionExpiresAt =
+    retentionTtlDays !== undefined ? computeRetentionExpiresAt(now, retentionTtlDays) : undefined;
 
   if (emailResult.email) {
     piiFields.push({
@@ -114,6 +124,7 @@ export function buildPiiFields(emailResult: HunterEmailResult, now: string): PII
       type: 'email',
       adapter: 'hunter',
       collectedAt: now,
+      retentionExpiresAt,
     });
   }
 

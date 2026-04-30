@@ -1,6 +1,7 @@
 // Parse GitHub API responses into Sourcerer types
 
 import {
+  computeRetentionExpiresAt,
   generateEvidenceId,
   type EvidenceItem,
   type PIIField,
@@ -294,10 +295,17 @@ export function buildProfileEvidence(
   languages: LanguageStat[],
   emails: string[],
   commitCount: number,
+  /**
+   * Optional retention TTL in days. When provided, every PIIField produced
+   * here is stamped with `retentionExpiresAt = now + ttlDays`. H-2.
+   */
+  retentionTtlDays?: number,
 ): { evidence: EvidenceItem[]; piiFields: PIIField[]; sourceData: SourceData } {
   const now = new Date().toISOString();
   const profileUrl = user.html_url;
   const evidence: EvidenceItem[] = [];
+  const retentionExpiresAt =
+    retentionTtlDays !== undefined ? computeRetentionExpiresAt(now, retentionTtlDays) : undefined;
 
   // Profile overview
   const profileClaim = `GitHub profile: ${user.public_repos} public repos, ${user.followers} followers, member since ${user.created_at.slice(0, 4)}`;
@@ -384,6 +392,7 @@ export function buildProfileEvidence(
       type: 'email',
       adapter: 'github',
       collectedAt: now,
+      retentionExpiresAt,
     });
   }
 
@@ -394,6 +403,7 @@ export function buildProfileEvidence(
       type: 'email',
       adapter: 'github',
       collectedAt: now,
+      retentionExpiresAt,
     });
   }
 
