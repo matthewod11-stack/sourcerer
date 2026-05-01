@@ -19,6 +19,7 @@
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
+    "pino": "^10.3.1",
     "zod": "^3.24.0"
   }
 }

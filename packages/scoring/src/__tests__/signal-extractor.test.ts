@@ -19,7 +19,11 @@ const ZERO_USAGE: TokenUsage = {
   model: 'mock',
 };
 import { generateEvidenceId } from '@sourcerer/core';
-import { extractSignals, formatEvidence, formatTalentProfile } from '../signal-extractor.js';
+import {
+  extractSignals,
+  formatEvidence,
+  formatTalentProfile,
+} from '../signal-extractor.js';
 import { validateGrounding } from '../grounding-validator.js';
 import { ExtractedSignalsSchema } from '../schemas.js';
 
@@ -28,7 +32,12 @@ import { ExtractedSignalsSchema } from '../schemas.js';
 const now = '2026-03-25T00:00:00Z';
 
 function makeEvidence(adapter: string, claim: string): EvidenceItem {
-  const input = { adapter, source: `https://${adapter}.test`, claim, retrievedAt: now };
+  const input = {
+    adapter,
+    source: `https://${adapter}.test`,
+    claim,
+    retrievedAt: now,
+  };
   return {
     id: generateEvidenceId(input),
     ...input,
@@ -95,8 +104,16 @@ const makeCandidate = (evidenceItems: EvidenceItem[]): Candidate => ({
 
 function makeValidSignals(ids: string[]): ExtractedSignals {
   return {
-    technicalDepth: { score: 82, evidenceIds: [ids[0], ids[1]], confidence: 0.9 },
-    domainRelevance: { score: 75, evidenceIds: [ids[1], ids[4]], confidence: 0.8 },
+    technicalDepth: {
+      score: 82,
+      evidenceIds: [ids[0], ids[1]],
+      confidence: 0.9,
+    },
+    domainRelevance: {
+      score: 75,
+      evidenceIds: [ids[1], ids[4]],
+      confidence: 0.8,
+    },
     trajectoryMatch: { score: 68, evidenceIds: [ids[3]], confidence: 0.7 },
     cultureFit: { score: 60, evidenceIds: [ids[4]], confidence: 0.6 },
     reachability: { score: 90, evidenceIds: [ids[5]], confidence: 0.95 },
@@ -108,7 +125,9 @@ function makeMockProvider(returnSignals: ExtractedSignals): AIProvider {
   return {
     name: 'mock',
     chat: vi.fn().mockResolvedValue({ content: '', usage: ZERO_USAGE }),
-    structuredOutput: vi.fn().mockResolvedValue({ data: returnSignals, usage: ZERO_USAGE }),
+    structuredOutput: vi
+      .fn()
+      .mockResolvedValue({ data: returnSignals, usage: ZERO_USAGE }),
   };
 }
 
@@ -139,7 +158,9 @@ describe('Grounding Validator', () => {
     });
     expect(result.validated.technicalDepth.evidenceIds).toHaveLength(2);
     // Confidence: 2 of 3 IDs survived → confidence × (2/3)
-    expect(result.validated.technicalDepth.confidence).toBeCloseTo(0.9 * (2 / 3));
+    expect(result.validated.technicalDepth.confidence).toBeCloseTo(
+      0.9 * (2 / 3),
+    );
     // Score (H-9): max(0.15 × 1, 1/3) = 0.333 → score × (1 - 0.333) = score × 0.667
     expect(result.validated.technicalDepth.score).toBeCloseTo(82 * (2 / 3), 5);
     // Metadata surfaces the penalty for renderers
@@ -171,7 +192,11 @@ describe('Grounding Validator', () => {
 
   it('zeros confidence and score when all IDs are invalid (H-9)', () => {
     const signals: ExtractedSignals = {
-      technicalDepth: { score: 50, evidenceIds: ['ev-fake1', 'ev-fake2'], confidence: 0.8 },
+      technicalDepth: {
+        score: 50,
+        evidenceIds: ['ev-fake1', 'ev-fake2'],
+        confidence: 0.8,
+      },
       domainRelevance: { score: 50, evidenceIds: [], confidence: 0.5 },
       trajectoryMatch: { score: 50, evidenceIds: [], confidence: 0.5 },
       cultureFit: { score: 50, evidenceIds: [], confidence: 0.5 },
@@ -185,7 +210,9 @@ describe('Grounding Validator', () => {
     expect(result.validated.technicalDepth.confidence).toBe(0);
     // 2 of 2 hallucinated → 100% penalty → score zeros out (no cap, by design)
     expect(result.validated.technicalDepth.score).toBe(0);
-    expect(result.validated.technicalDepth.hallucinationPenalty?.penaltyApplied).toBe(1);
+    expect(
+      result.validated.technicalDepth.hallucinationPenalty?.penaltyApplied,
+    ).toBe(1);
     expect(result.violations).toHaveLength(2);
   });
 
@@ -205,14 +232,22 @@ describe('Grounding Validator', () => {
     // no hallucinationPenalty attached.
     expect(result.validated.technicalDepth.confidence).toBe(0.3);
     expect(result.validated.technicalDepth.score).toBe(30);
-    expect(result.validated.technicalDepth.hallucinationPenalty).toBeUndefined();
+    expect(
+      result.validated.technicalDepth.hallucinationPenalty,
+    ).toBeUndefined();
     expect(result.violations).toHaveLength(0);
   });
 
   it('omits hallucinationPenalty when grounding is clean (H-9)', () => {
     const signals = makeValidSignals(evidenceIdList);
     const result = validateGrounding(signals, canonicalIds);
-    for (const dim of ['technicalDepth', 'domainRelevance', 'trajectoryMatch', 'cultureFit', 'reachability'] as const) {
+    for (const dim of [
+      'technicalDepth',
+      'domainRelevance',
+      'trajectoryMatch',
+      'cultureFit',
+      'reachability',
+    ] as const) {
       expect(result.validated[dim].hallucinationPenalty).toBeUndefined();
     }
   });
@@ -237,7 +272,9 @@ describe('computeHallucinationPenalty (H-9)', () => {
 
   it('floor dominates when ratio < floor (1 of 50 → 15%, prevents padding attack)', () => {
     // floor = 0.15, proportional = 0.02 → max = 0.15
-    expect(computeHallucinationPenalty(1, 50)).toBeCloseTo(HALLUCINATION_PENALTY_FLOOR);
+    expect(computeHallucinationPenalty(1, 50)).toBeCloseTo(
+      HALLUCINATION_PENALTY_FLOOR,
+    );
   });
 
   it('1 of 1 → 100% (full fabrication, no cap)', () => {
@@ -272,12 +309,22 @@ describe('Signal Extractor', () => {
     const result = await extractSignals(candidate, talentProfile, provider);
 
     expect(result.signals.technicalDepth.score).toBe(82);
-    expect(result.signals.reachability.evidenceIds).toContain(evidenceIdList[5]);
+    expect(result.signals.reachability.evidenceIds).toContain(
+      evidenceIdList[5],
+    );
+    expect(result.signals.promptVersions).toEqual({
+      'scoring-signal-extract': 2,
+    });
+    expect(result.prompt).toMatchObject({
+      name: 'scoring-signal-extract',
+      version: 2,
+    });
     expect(result.grounding.violations).toHaveLength(0);
 
     // Verify provider was called with structured output
     expect(provider.structuredOutput).toHaveBeenCalledOnce();
-    const callArgs = (provider.structuredOutput as ReturnType<typeof vi.fn>).mock.calls[0];
+    const callArgs = (provider.structuredOutput as ReturnType<typeof vi.fn>)
+      .mock.calls[0];
     expect(callArgs[0][0].role).toBe('user');
     expect(callArgs[1].schema).toBe(ExtractedSignalsSchema);
     expect(callArgs[1].temperature).toBe(0.2);
@@ -318,9 +365,12 @@ describe('Signal Extractor', () => {
     const provider = makeMockProvider(makeValidSignals(evidenceIdList));
     const candidate = makeCandidate(evidence);
 
-    await extractSignals(candidate, talentProfile, provider, { temperature: 0.5 });
+    await extractSignals(candidate, talentProfile, provider, {
+      temperature: 0.5,
+    });
 
-    const callArgs = (provider.structuredOutput as ReturnType<typeof vi.fn>).mock.calls[0];
+    const callArgs = (provider.structuredOutput as ReturnType<typeof vi.fn>)
+      .mock.calls[0];
     expect(callArgs[1].temperature).toBe(0.5);
   });
 });
@@ -329,7 +379,9 @@ describe('Format Helpers', () => {
   it('formats evidence items as <evidence> blocks with id/adapter/confidence attrs', () => {
     const formatted = formatEvidence(evidence);
 
-    expect(formatted).toContain(`<evidence id="${evidence[0].id}" adapter="github" confidence="medium">`);
+    expect(formatted).toContain(
+      `<evidence id="${evidence[0].id}" adapter="github" confidence="medium">`,
+    );
     expect(formatted).toContain('Has 50 public repos');
     expect(formatted).toContain('</evidence>');
     expect(formatted.split('\n')).toHaveLength(6);
@@ -346,7 +398,9 @@ describe('Format Helpers', () => {
     expect(formatted.endsWith('</profile>')).toBe(true);
 
     // Strip the wrapper to parse the JSON body
-    const json = formatted.replace(/^<profile>\n/, '').replace(/\n<\/profile>$/, '');
+    const json = formatted
+      .replace(/^<profile>\n/, '')
+      .replace(/\n<\/profile>$/, '');
     const parsed = JSON.parse(json);
 
     expect(parsed.role.title).toBe('Senior Backend Engineer');

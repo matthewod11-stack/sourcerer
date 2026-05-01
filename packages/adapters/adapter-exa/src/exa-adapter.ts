@@ -2,7 +2,10 @@
 
 import { Exa } from 'exa-js';
 import {
+  ApiContractError,
   generateEvidenceId,
+  parseApiContractPayload,
+  warnApiContractUnknownFields,
   type DataSource,
   type DataSourceCapability,
   type RateLimitConfig,
@@ -12,12 +15,46 @@ import {
   type EnrichmentResult,
   type BatchResult,
   type CostEstimate,
+  type CostEstimateInput,
 } from '@sourcerer/core';
+import { z } from 'zod';
 import { RateLimiter } from './rate-limiter.js';
 import { parseExaResult, type ExaResult } from './parsers.js';
 
 const DEFAULT_NUM_RESULTS = 10;
 const COST_PER_SEARCH_ESTIMATE = 0.005;
+const NullableStringToOptional = z
+  .string()
+  .nullable()
+  .optional()
+  .transform((value) => value ?? undefined);
+
+const ExaResultSchema = z
+  .object({
+    id: z.string(),
+    title: z.string().nullable(),
+    url: z.string(),
+    text: z.string().optional(),
+    publishedDate: z.string().optional(),
+    author: NullableStringToOptional,
+    score: z.number().optional(),
+  })
+  .passthrough();
+
+const ExaSearchResponseSchema = z
+  .object({
+    results: z.array(ExaResultSchema),
+    costDollars: z.object({ total: z.number() }).passthrough().optional(),
+    requestId: z.string().optional(),
+  })
+  .passthrough();
+
+const ExaContentsResponseSchema = z
+  .object({
+    results: z.array(ExaResultSchema),
+    requestId: z.string().optional(),
+  })
+  .passthrough();
 
 export class ExaAdapter implements DataSource {
   readonly name = 'exa';
@@ -57,7 +94,9 @@ export class ExaAdapter implements DataSource {
     }
 
     // P1-P4: Tiered queries
-    const sortedTiers = [...config.tiers].sort((a, b) => a.priority - b.priority);
+    const sortedTiers = [...config.tiers].sort(
+      (a, b) => a.priority - b.priority,
+    );
 
     for (const tier of sortedTiers) {
       for (const query of tier.queries) {
@@ -71,27 +110,40 @@ export class ExaAdapter implements DataSource {
             maxCandidates - totalCandidates,
           );
 
-          const response = await this.client.search(query.text, {
-            numResults,
-            includeDomains: query.includeDomains,
-            excludeDomains: query.excludeDomains,
-            category: 'people',
-          });
-
-          const candidates = response.results.map((r: unknown) =>
-            parseExaResult(r as ExaResult, query.text, undefined, this.retentionTtlDays),
+          const response = parseExaResponse(
+            await this.client.search(query.text, {
+              numResults,
+              includeDomains: query.includeDomains,
+              excludeDomains: query.excludeDomains,
+              category: 'people',
+            }),
+            'search',
           );
 
-          const costIncurred = response.costDollars?.total ?? numResults * COST_PER_SEARCH_ESTIMATE;
+          const candidates = response.results.map((r: unknown) =>
+            parseExaResult(
+              r as ExaResult,
+              query.text,
+              undefined,
+              this.retentionTtlDays,
+            ),
+          );
+
+          const costIncurred =
+            response.costDollars?.total ??
+            numResults * COST_PER_SEARCH_ESTIMATE;
 
           totalCandidates += candidates.length;
 
           yield {
             candidates,
-            hasMore: totalCandidates < maxCandidates && tier !== sortedTiers[sortedTiers.length - 1],
+            hasMore:
+              totalCandidates < maxCandidates &&
+              tier !== sortedTiers[sortedTiers.length - 1],
             costIncurred,
           };
         } catch (err) {
+          if (err instanceof ApiContractError) throw err;
           // On error, yield an empty page and continue to next query
           yield {
             candidates: [],
@@ -108,23 +160,29 @@ export class ExaAdapter implements DataSource {
       await this.limiter.acquire();
 
       try {
-        const response = await this.client.findSimilar(url, {
-          numResults: DEFAULT_NUM_RESULTS,
-          excludeSourceDomain: true,
-        });
+        const response = parseExaResponse(
+          await this.client.findSimilar(url, {
+            numResults: DEFAULT_NUM_RESULTS,
+            excludeSourceDomain: true,
+          }),
+          'findSimilar',
+        );
 
         const candidates = response.results.map((r: unknown) =>
           parseExaResult(r as ExaResult, '', url, this.retentionTtlDays),
         );
 
-        const costIncurred = response.costDollars?.total ?? DEFAULT_NUM_RESULTS * COST_PER_SEARCH_ESTIMATE;
+        const costIncurred =
+          response.costDollars?.total ??
+          DEFAULT_NUM_RESULTS * COST_PER_SEARCH_ESTIMATE;
 
         yield {
           candidates,
           hasMore: false,
           costIncurred,
         };
-      } catch {
+      } catch (err) {
+        if (err instanceof ApiContractError) throw err;
         yield { candidates: [], hasMore: false, costIncurred: 0 };
       }
     }
@@ -141,7 +199,11 @@ export class ExaAdapter implements DataSource {
         candidateId: candidate.id,
         evidence: [],
         piiFields: [],
-        sourceData: { adapter: 'exa', retrievedAt: new Date().toISOString(), urls: [] },
+        sourceData: {
+          adapter: 'exa',
+          retrievedAt: new Date().toISOString(),
+          urls: [],
+        },
         enrichedAt: new Date().toISOString(),
       };
     }
@@ -149,7 +211,10 @@ export class ExaAdapter implements DataSource {
     await this.limiter.acquire();
 
     try {
-      const response = await this.client.getContents(urls.slice(0, 5));
+      const response = parseExaContentsResponse(
+        await this.client.getContents(urls.slice(0, 5)),
+        'getContents',
+      );
       const now = new Date().toISOString();
 
       const evidence = response.results.map((r: unknown) => {
@@ -158,7 +223,12 @@ export class ExaAdapter implements DataSource {
         const snippet = text.slice(0, 200).replace(/\n/g, ' ').trim();
         const claim = `Content from ${result.url}: ${snippet}`;
         return {
-          id: generateEvidenceId({ adapter: 'exa', source: result.url, claim, retrievedAt: now }),
+          id: generateEvidenceId({
+            adapter: 'exa',
+            source: result.url,
+            claim,
+            retrievedAt: now,
+          }),
           claim,
           source: result.url,
           adapter: 'exa' as const,
@@ -176,21 +246,29 @@ export class ExaAdapter implements DataSource {
         sourceData: { adapter: 'exa', retrievedAt: now, urls },
         enrichedAt: now,
       };
-    } catch {
+    } catch (err) {
+      if (err instanceof ApiContractError) throw err;
       return {
         adapter: 'exa',
         candidateId: candidate.id,
         evidence: [],
         piiFields: [],
-        sourceData: { adapter: 'exa', retrievedAt: new Date().toISOString(), urls },
+        sourceData: {
+          adapter: 'exa',
+          retrievedAt: new Date().toISOString(),
+          urls,
+        },
         enrichedAt: new Date().toISOString(),
       };
     }
   }
 
-  async enrichBatch(candidates: Candidate[]): Promise<BatchResult<EnrichmentResult>> {
+  async enrichBatch(
+    candidates: Candidate[],
+  ): Promise<BatchResult<EnrichmentResult>> {
     const succeeded: { candidateId: string; result: EnrichmentResult }[] = [];
-    const failed: { candidateId: string; error: Error; retryable: boolean }[] = [];
+    const failed: { candidateId: string; error: Error; retryable: boolean }[] =
+      [];
     let totalCost = 0;
 
     for (const candidate of candidates) {
@@ -221,7 +299,18 @@ export class ExaAdapter implements DataSource {
     }
   }
 
-  estimateCost(config: SearchConfig): CostEstimate {
+  estimateCost(config: CostEstimateInput): CostEstimate {
+    if (!isSearchConfig(config)) {
+      const estimatedCost = config.maxCandidates * COST_PER_SEARCH_ESTIMATE;
+      return {
+        estimatedCost,
+        breakdown: { enrich: estimatedCost },
+        searchCount: 0,
+        enrichCount: config.maxCandidates,
+        currency: 'USD',
+      };
+    }
+
     let searchCount = 0;
 
     // Similarity seeds
@@ -244,4 +333,30 @@ export class ExaAdapter implements DataSource {
       currency: 'USD',
     };
   }
+}
+
+function isSearchConfig(config: CostEstimateInput): config is SearchConfig {
+  return 'tiers' in config;
+}
+
+function parseExaResponse(
+  payload: unknown,
+  endpoint: 'search' | 'findSimilar',
+): z.infer<typeof ExaSearchResponseSchema> {
+  return parseApiContractPayload(payload, ExaSearchResponseSchema, {
+    adapter: 'exa',
+    endpoint,
+    warn: warnApiContractUnknownFields,
+  });
+}
+
+function parseExaContentsResponse(
+  payload: unknown,
+  endpoint: 'getContents',
+): z.infer<typeof ExaContentsResponseSchema> {
+  return parseApiContractPayload(payload, ExaContentsResponseSchema, {
+    adapter: 'exa',
+    endpoint,
+    warn: warnApiContractUnknownFields,
+  });
 }

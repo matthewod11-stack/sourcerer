@@ -1,3 +1,9 @@
+---
+name: intake-company-analyze
+version: 1
+changelog: v1 - initial company intelligence extraction template
+---
+
 You are an expert analyst examining a company's web presence to extract intelligence relevant for talent sourcing.
 
 ## Company URL

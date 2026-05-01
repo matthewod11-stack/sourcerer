@@ -65,6 +65,7 @@ function makeMinimalCandidate(
       cultureFit: { score: 6, evidenceIds: [], confidence: 0.7 },
       reachability: { score: 5, evidenceIds: [], confidence: 0.6 },
       redFlags: [],
+      promptVersions: { 'scoring-signal-extract': 2 },
     },
     score: {
       total,
@@ -80,6 +81,7 @@ function makeMinimalCandidate(
       ],
       weights: { technicalDepth: 0.3 },
       redFlags: [],
+      promptVersions: { 'scoring-signal-extract': 2, 'scoring-narrative': 2 },
     },
     narrative: `${name} is a strong candidate.`,
     tier,
@@ -107,7 +109,11 @@ async function createRun(
       candidateCount: candidates.length,
       candidates,
     };
-    await writeFile(join(runDir, 'candidates.json'), JSON.stringify(envelope), 'utf-8');
+    await writeFile(
+      join(runDir, 'candidates.json'),
+      JSON.stringify(envelope),
+      'utf-8',
+    );
   }
   return runDir;
 }
@@ -245,6 +251,32 @@ describe('runsCommand', () => {
     expect(parsed[0].meta.roleName).toBe('Test Role');
   });
 
+  it('shows prompt versions for a run', async () => {
+    const runsDir = join(testDir, 'runs');
+    await createRun(
+      runsDir,
+      '2026-04-06-role',
+      {
+        runId: 'run-prompt-versions',
+        startedAt: '2026-04-06T10:00:00Z',
+        roleName: 'Test Role',
+      },
+      [makeMinimalCandidate('cand-1', 'Jane Doe')],
+    );
+
+    const { output, restore } = captureConsole();
+    try {
+      await runsCommand(['show', 'run-prompt-versions', '--runs-dir', runsDir]);
+    } finally {
+      restore();
+    }
+
+    const fullOutput = output.join('\n');
+    expect(fullOutput).toContain('Prompts used:');
+    expect(fullOutput).toContain('scoring-signal-extract v2');
+    expect(fullOutput).toContain('scoring-narrative v2');
+  });
+
   it('clean --older-than 0d --yes deletes runs', async () => {
     const runsDir = join(testDir, 'runs');
     await createRun(runsDir, '2026-04-01-old-run', {
@@ -254,7 +286,14 @@ describe('runsCommand', () => {
 
     const { output, restore } = captureConsole();
     try {
-      await runsCommand(['clean', '--older-than', '0d', '--yes', '--runs-dir', runsDir]);
+      await runsCommand([
+        'clean',
+        '--older-than',
+        '0d',
+        '--yes',
+        '--runs-dir',
+        runsDir,
+      ]);
     } finally {
       restore();
     }
@@ -276,7 +315,13 @@ describe('runsCommand', () => {
 
     const { output, restore } = captureConsole();
     try {
-      await runsCommand(['clean', '--older-than', '999d', '--runs-dir', runsDir]);
+      await runsCommand([
+        'clean',
+        '--older-than',
+        '999d',
+        '--runs-dir',
+        runsDir,
+      ]);
     } finally {
       restore();
     }

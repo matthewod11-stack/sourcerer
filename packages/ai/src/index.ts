@@ -31,14 +31,24 @@ export function getDefaultModel(provider: AIProviderName): string {
 export {
   interpolate,
   loadTemplate,
+  parsePromptTemplate,
   renderTemplate,
   listTemplates,
   getPromptsDir,
 } from './template-loader.js';
-export type { TemplateContext } from './template-loader.js';
+export type {
+  PromptMetadata,
+  PromptTemplate,
+  RenderedTemplate,
+  TemplateContext,
+} from './template-loader.js';
 
 // Response cache
-export { ResponseCache, generateCacheKey, CACHE_TTL } from './response-cache.js';
+export {
+  ResponseCache,
+  generateCacheKey,
+  CACHE_TTL,
+} from './response-cache.js';
 export type { CacheEntry, CacheConfig } from './response-cache.js';
 
 // Pricing & cost computation (H-7)

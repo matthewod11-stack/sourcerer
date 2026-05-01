@@ -5,6 +5,7 @@ import {
   renderTemplate,
   listTemplates,
   getPromptsDir,
+  parsePromptTemplate,
 } from '../template-loader.js';
 import { join } from 'node:path';
 
@@ -28,9 +29,9 @@ describe('interpolate', () => {
   });
 
   it('throws on missing variables', () => {
-    expect(() => interpolate('Hello {{name}} {{age}}!', { name: 'Alice' })).toThrow(
-      'Missing template variables: age',
-    );
+    expect(() =>
+      interpolate('Hello {{name}} {{age}}!', { name: 'Alice' }),
+    ).toThrow('Missing template variables: age');
   });
 
   it('throws listing all missing variables', () => {
@@ -64,9 +65,13 @@ describe('getPromptsDir', () => {
 
 describe('loadTemplate', () => {
   it('loads an existing template', async () => {
-    const content = await loadTemplate('intake-role-parse');
-    expect(content).toContain('job description');
-    expect(content).toContain('{{jobDescription}}');
+    const template = await loadTemplate('intake-role-parse');
+    expect(template.metadata).toMatchObject({
+      name: 'intake-role-parse',
+      version: 1,
+    });
+    expect(template.content).toContain('job description');
+    expect(template.content).toContain('{{jobDescription}}');
   });
 
   it('throws for non-existent template', async () => {
@@ -81,14 +86,45 @@ describe('renderTemplate', () => {
     const result = await renderTemplate('intake-role-parse', {
       jobDescription: 'Senior TypeScript Engineer at Acme Corp',
     });
-    expect(result).toContain('Senior TypeScript Engineer at Acme Corp');
-    expect(result).not.toContain('{{jobDescription}}');
+    expect(result.metadata.name).toBe('intake-role-parse');
+    expect(result.content).toContain('Senior TypeScript Engineer at Acme Corp');
+    expect(result.content).not.toContain('{{jobDescription}}');
   });
 
   it('throws on missing variables', async () => {
     await expect(renderTemplate('intake-role-parse', {})).rejects.toThrow(
       'Missing template variables',
     );
+  });
+});
+
+describe('parsePromptTemplate', () => {
+  it('requires valid front matter', () => {
+    expect(() => parsePromptTemplate('missing', 'plain prompt')).toThrow(
+      'missing YAML front-matter',
+    );
+  });
+
+  it('parses metadata and body content', () => {
+    const template = parsePromptTemplate(
+      'demo',
+      [
+        '---',
+        'name: demo',
+        'version: 3',
+        'changelog: v3 - changed output contract',
+        '---',
+        '',
+        'Hello {{name}}',
+      ].join('\n'),
+    );
+
+    expect(template.metadata).toEqual({
+      name: 'demo',
+      version: 3,
+      changelog: 'v3 - changed output contract',
+    });
+    expect(template.content).toBe('Hello {{name}}');
   });
 });
 

@@ -45,18 +45,18 @@ sourcerer results       View and re-export results
 
 ## Tech Stack
 
-| Technology | Role |
-|---|---|
-| TypeScript | Language (strict mode, ESM throughout) |
-| Turborepo | Monorepo build orchestration |
-| Node.js | Runtime |
-| pnpm | Package manager (workspace protocol) |
-| Vitest | Test runner (570 tests across 13 packages) |
-| Exa | Candidate discovery (semantic search) |
-| GitHub API | Code signal enrichment |
-| X/Twitter API | Social signal enrichment |
-| Hunter.io | Email finder and verification |
-| Notion API | Candidate database output |
+| Technology    | Role                                       |
+| ------------- | ------------------------------------------ |
+| TypeScript    | Language (strict mode, ESM throughout)     |
+| Turborepo     | Monorepo build orchestration               |
+| Node.js       | Runtime                                    |
+| pnpm          | Package manager (workspace protocol)       |
+| Vitest        | Test runner (570 tests across 13 packages) |
+| Exa           | Candidate discovery (semantic search)      |
+| GitHub API    | Code signal enrichment                     |
+| X/Twitter API | Social signal enrichment                   |
+| Hunter.io     | Email finder and verification              |
+| Notion API    | Candidate database output                  |
 
 ## Project Structure
 
@@ -107,25 +107,39 @@ pnpm --filter @sourcerer/cli start results --tier 1
 
 ### Required API Keys
 
-| Adapter | Key | Free Tier |
-|---|---|---|
-| Exa | `EXA_API_KEY` | 1,000 searches/mo |
-| GitHub | `GITHUB_TOKEN` | 5,000 req/hr (authenticated) |
-| X/Twitter | `X_API_KEY` | Basic tier |
-| Hunter.io | `HUNTER_API_KEY` | 25 searches/mo |
-| Notion | `NOTION_TOKEN` | Free (integration token) |
+| Adapter   | Key              | Free Tier                    |
+| --------- | ---------------- | ---------------------------- |
+| Exa       | `EXA_API_KEY`    | 1,000 searches/mo            |
+| GitHub    | `GITHUB_TOKEN`   | 5,000 req/hr (authenticated) |
+| X/Twitter | `X_API_KEY`      | Basic tier                   |
+| Hunter.io | `HUNTER_API_KEY` | 25 searches/mo               |
+| Notion    | `NOTION_TOKEN`   | Free (integration token)     |
 
 Keys are stored in `~/.sourcerer/config.yaml` (outside the repo, never committed).
+
+## Security & Data Handling
+
+Sourcerer is currently designed for local, single-user operation. Run artifacts live under `runs/<date-role>/` by default and include `candidates.json`, `checkpoint.json`, `run-meta.json`, and optional report/output files. These files are gitignored, but they are plaintext JSON/Markdown on disk.
+
+Candidate artifacts may contain PII including emails, phone numbers, addresses when an adapter supplies them, source URLs, adapter provenance, collection timestamps, and `retentionExpiresAt` values. API keys are not stored in run artifacts; keys live in `~/.sourcerer/config.yaml` or environment variables.
+
+The default PII retention TTL is 90 days unless changed during `sourcerer init` or in `~/.sourcerer/config.yaml`. To redact expired local PII, run:
+
+```bash
+sourcerer candidates purge --expired
+```
+
+At-rest encryption is not implemented yet. Do not run Sourcerer on shared machines, shared workspaces, synced folders, or multi-user servers unless you add disk-level protection and access controls outside the app. Remote copies pushed to tools like Notion are not affected by local purge commands.
 
 ### Model Selection
 
 Sourcerer uses Anthropic Sonnet 4.6 (`claude-sonnet-4-6`) by default for per-candidate scoring — fast, cheap, and high-quality enough for the structured-output workload. Override per-run by setting `aiProvider.model` in `~/.sourcerer/config.yaml`. The current defaults are visible at any time via `sourcerer config status`.
 
-| Model | When to pick it |
-|---|---|
-| `claude-opus-4-7` | Deep narrative reasoning, batch scoring with 1M-context (post-Phase-4 enhancement E-5) |
-| `claude-sonnet-4-6` | **Default.** Per-candidate scoring, intake conversation, content research |
-| `claude-haiku-4-5` | Bulk preprocessing, dedup-time identity scoring, very high-volume runs |
+| Model               | When to pick it                                                                        |
+| ------------------- | -------------------------------------------------------------------------------------- |
+| `claude-opus-4-7`   | Deep narrative reasoning, batch scoring with 1M-context (post-Phase-4 enhancement E-5) |
+| `claude-sonnet-4-6` | **Default.** Per-candidate scoring, intake conversation, content research              |
+| `claude-haiku-4-5`  | Bulk preprocessing, dedup-time identity scoring, very high-volume runs                 |
 
 OpenAI provider also supported (`aiProvider.name: openai`); current default is `gpt-4o`.
 

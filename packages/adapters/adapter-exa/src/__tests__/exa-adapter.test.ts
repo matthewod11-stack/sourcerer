@@ -7,7 +7,17 @@ import {
 } from '../parsers.js';
 import { RateLimiter } from '../rate-limiter.js';
 import { ExaAdapter } from '../exa-adapter.js';
-import type { SearchConfig, Candidate } from '@sourcerer/core';
+import {
+  ApiContractError,
+  type SearchConfig,
+  type Candidate,
+} from '@sourcerer/core';
+
+const mockExaSdk = vi.hoisted(() => ({
+  search: vi.fn(),
+  findSimilar: vi.fn(),
+  getContents: vi.fn(),
+}));
 
 // --- Mock Exa SDK ---
 
@@ -66,9 +76,9 @@ const mockGetContentsResponse = {
 vi.mock('exa-js', () => {
   return {
     Exa: class MockExa {
-      search = vi.fn().mockResolvedValue(mockSearchResponse);
-      findSimilar = vi.fn().mockResolvedValue(mockFindSimilarResponse);
-      getContents = vi.fn().mockResolvedValue(mockGetContentsResponse);
+      search = mockExaSdk.search;
+      findSimilar = mockExaSdk.findSimilar;
+      getContents = mockExaSdk.getContents;
     },
   };
 });
@@ -162,7 +172,9 @@ describe('Parsers', () => {
 
   describe('extractEmails', () => {
     it('extracts multiple emails', () => {
-      const emails = extractEmails('Contact sarah@test.com or john@company.org');
+      const emails = extractEmails(
+        'Contact sarah@test.com or john@company.org',
+      );
       expect(emails).toContain('sarah@test.com');
       expect(emails).toContain('john@company.org');
     });
@@ -224,15 +236,26 @@ describe('ExaAdapter', () => {
   let adapter: ExaAdapter;
 
   beforeEach(() => {
+    mockExaSdk.search.mockReset().mockResolvedValue(mockSearchResponse);
+    mockExaSdk.findSimilar
+      .mockReset()
+      .mockResolvedValue(mockFindSimilarResponse);
+    mockExaSdk.getContents
+      .mockReset()
+      .mockResolvedValue(mockGetContentsResponse);
     adapter = new ExaAdapter('test-api-key', { requestsPerSecond: 100 }); // fast for tests
   });
 
-  const makeSearchConfig = (overrides?: Partial<SearchConfig>): SearchConfig => ({
+  const makeSearchConfig = (
+    overrides?: Partial<SearchConfig>,
+  ): SearchConfig => ({
     roleName: 'Senior Backend Engineer',
     tiers: [
       {
         priority: 1,
-        queries: [{ text: 'senior backend engineer at DeFi companies', maxResults: 5 }],
+        queries: [
+          { text: 'senior backend engineer at DeFi companies', maxResults: 5 },
+        ],
       },
     ],
     scoringWeights: { technicalDepth: 0.3, domainRelevance: 0.7 },
@@ -287,8 +310,55 @@ describe('ExaAdapter', () => {
       const pages = [];
       for await (const page of adapter.search(config)) pages.push(page);
 
-      const totalCandidates = pages.reduce((sum, p) => sum + p.candidates.length, 0);
+      const totalCandidates = pages.reduce(
+        (sum, p) => sum + p.candidates.length,
+        0,
+      );
       expect(totalCandidates).toBeLessThanOrEqual(2); // may get 1-2 due to batch
+    });
+
+    it('throws ApiContractError when a result is missing a required field', async () => {
+      mockExaSdk.search.mockResolvedValueOnce({
+        results: [
+          {
+            id: 'exa-missing-url',
+            title: 'Missing URL',
+          },
+        ],
+        requestId: 'req-missing',
+      });
+
+      const gen = adapter.search(makeSearchConfig());
+      const error = await gen.next().catch((err: unknown) => err);
+
+      expect(error).toBeInstanceOf(ApiContractError);
+      expect(error).toMatchObject({
+        adapter: 'exa',
+        fieldPaths: ['results[0].url'],
+      });
+    });
+
+    it('warns on unknown fields without rejecting the response', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      mockExaSdk.search.mockResolvedValueOnce({
+        ...mockSearchResponse,
+        results: [
+          {
+            ...mockSearchResponse.results[0],
+            neural_score_explanation: 'new-api-field',
+          },
+        ],
+      });
+
+      const pages = [];
+      for await (const page of adapter.search(makeSearchConfig())) {
+        pages.push(page);
+      }
+
+      expect(pages).toHaveLength(1);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('results[0].neural_score_explanation'),
+      );
     });
   });
 
@@ -315,7 +385,13 @@ describe('ExaAdapter', () => {
           mergeConfidence: 1,
         },
         name: 'Sarah Chen',
-        sources: { exa: { adapter: 'exa', retrievedAt: '2026-03-23T00:00:00Z', urls: ['https://sarahchen.dev'] } },
+        sources: {
+          exa: {
+            adapter: 'exa',
+            retrievedAt: '2026-03-23T00:00:00Z',
+            urls: ['https://sarahchen.dev'],
+          },
+        },
         evidence: [],
         enrichments: {},
         pii: { fields: [], retentionPolicy: 'default' },
@@ -330,7 +406,11 @@ describe('ExaAdapter', () => {
     it('handles candidate with no URLs', async () => {
       const candidate: Candidate = {
         id: 'test-id',
-        identity: { canonicalId: 'test-id', observedIdentifiers: [], mergeConfidence: 1 },
+        identity: {
+          canonicalId: 'test-id',
+          observedIdentifiers: [],
+          mergeConfidence: 1,
+        },
         name: 'Test',
         sources: {},
         evidence: [],
@@ -362,6 +442,14 @@ describe('ExaAdapter', () => {
       const estimate = adapter.estimateCost(config);
       expect(estimate.searchCount).toBe(5); // 3 queries + 2 seeds
       expect(estimate.estimatedCost).toBeGreaterThan(0);
+      expect(estimate.currency).toBe('USD');
+    });
+
+    it('estimates enrichment cost from minimal input', () => {
+      const estimate = adapter.estimateCost({ maxCandidates: 5 });
+      expect(estimate.searchCount).toBe(0);
+      expect(estimate.enrichCount).toBe(5);
+      expect(estimate.estimatedCost).toBeCloseTo(0.025);
       expect(estimate.currency).toBe('USD');
     });
   });

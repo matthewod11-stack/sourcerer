@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { XAdapter } from '../x-adapter.js';
 import { buildProfileEvidence, buildTweetEvidence } from '../parsers.js';
-import type { Candidate, ObservedIdentifier } from '@sourcerer/core';
-import type { XUser, XTweet } from '../x-client.js';
+import {
+  ApiContractError,
+  type Candidate,
+  type ObservedIdentifier,
+} from '@sourcerer/core';
+import { XClient, type XUser, type XTweet } from '../x-client.js';
 
 // --- Mock Data ---
 
@@ -10,7 +14,8 @@ const mockXUser: XUser = {
   id: '123456789',
   username: 'alexdev',
   name: 'Alex Developer',
-  description: 'Staff Engineer @BigCorp | Building distributed systems | Rust, Go, TypeScript',
+  description:
+    'Staff Engineer @BigCorp | Building distributed systems | Rust, Go, TypeScript',
   location: 'San Francisco, CA',
   public_metrics: {
     followers_count: 5000,
@@ -34,7 +39,12 @@ const mockXTweets: XTweet[] = [
     id: 't1',
     text: 'Just shipped a new microservice in Rust. The performance gains are incredible compared to our Node.js version.',
     created_at: '2026-03-20T10:00:00Z',
-    public_metrics: { like_count: 150, retweet_count: 30, reply_count: 12, impression_count: 25000 },
+    public_metrics: {
+      like_count: 150,
+      retweet_count: 30,
+      reply_count: 12,
+      impression_count: 25000,
+    },
   },
   {
     id: 't2',
@@ -46,7 +56,12 @@ const mockXTweets: XTweet[] = [
     id: 't3',
     text: 'Deployed the new API gateway. Zero downtime migration ftw!',
     created_at: '2026-03-18T09:00:00Z',
-    public_metrics: { like_count: 200, retweet_count: 40, reply_count: 20, impression_count: 30000 },
+    public_metrics: {
+      like_count: 200,
+      retweet_count: 40,
+      reply_count: 20,
+      impression_count: 30000,
+    },
   },
   {
     id: 't4',
@@ -58,7 +73,12 @@ const mockXTweets: XTweet[] = [
     id: 't5',
     text: 'Open source PR merged into kubernetes — my first k8s contribution!',
     created_at: '2026-03-16T16:00:00Z',
-    public_metrics: { like_count: 500, retweet_count: 100, reply_count: 35, impression_count: 50000 },
+    public_metrics: {
+      like_count: 500,
+      retweet_count: 100,
+      reply_count: 35,
+      impression_count: 50000,
+    },
   },
   {
     id: 't6',
@@ -74,7 +94,7 @@ const mockXTweets: XTweet[] = [
   },
   {
     id: 't8',
-    text: 'Coffee thoughts: the best code is the code you don\'t write.',
+    text: "Coffee thoughts: the best code is the code you don't write.",
     created_at: '2026-03-13T07:00:00Z',
     public_metrics: { like_count: 300, retweet_count: 60, reply_count: 25 },
   },
@@ -96,7 +116,12 @@ const mockXTweets: XTweet[] = [
 
 let mockFetch: ReturnType<typeof vi.fn>;
 
-function createMockResponse(data: unknown, ok = true, status = 200, headers: Record<string, string> = {}) {
+function createMockResponse(
+  data: unknown,
+  ok = true,
+  status = 200,
+  headers: Record<string, string> = {},
+) {
   return {
     ok,
     status,
@@ -122,7 +147,10 @@ beforeEach(() => {
     if (path === '/2/users/by/username/privatedev') {
       return createMockResponse({ data: mockProtectedUser });
     }
-    if (path === '/2/users/by/username/x') {
+    if (
+      path === '/2/users/by/username/X' ||
+      path === '/2/users/by/username/x'
+    ) {
       return createMockResponse({ data: mockXUser });
     }
 
@@ -147,12 +175,9 @@ beforeEach(() => {
 
     // Rate limit response
     if (path === '/2/users/by/username/ratelimited') {
-      return createMockResponse(
-        { errors: [{ code: '88' }] },
-        false,
-        429,
-        { 'retry-after': '60' },
-      );
+      return createMockResponse({ errors: [{ code: '88' }] }, false, 429, {
+        'retry-after': '60',
+      });
     }
 
     return createMockResponse({});
@@ -180,7 +205,11 @@ function makeCandidate(handle?: string): Candidate {
   }
   return {
     id: 'test-candidate',
-    identity: { canonicalId: 'test-candidate', observedIdentifiers: identifiers, mergeConfidence: 1 },
+    identity: {
+      canonicalId: 'test-candidate',
+      observedIdentifiers: identifiers,
+      mergeConfidence: 1,
+    },
     name: 'Alex Developer',
     sources: {},
     evidence: [],
@@ -236,18 +265,24 @@ describe('XAdapter', () => {
       expect(result.evidence.length).toBeGreaterThan(0);
       // Should have profile evidence (bio, followers, account age) but no tweet evidence
       const tweetEvidenceClaims = result.evidence.filter(
-        (e) => e.claim.includes('tweets per week') || e.claim.includes('engagement rate'),
+        (e) =>
+          e.claim.includes('tweets per week') ||
+          e.claim.includes('engagement rate'),
       );
       expect(tweetEvidenceClaims).toHaveLength(0);
     });
 
     it('handles x.com/username URL pattern extraction', async () => {
-      const result = await adapter.enrich(makeCandidate('https://x.com/alexdev'));
+      const result = await adapter.enrich(
+        makeCandidate('https://x.com/alexdev'),
+      );
       expect(result.evidence.length).toBeGreaterThanOrEqual(4);
     });
 
     it('handles twitter.com/username URL pattern extraction', async () => {
-      const result = await adapter.enrich(makeCandidate('https://twitter.com/alexdev'));
+      const result = await adapter.enrich(
+        makeCandidate('https://twitter.com/alexdev'),
+      );
       expect(result.evidence.length).toBeGreaterThanOrEqual(4);
     });
 
@@ -292,14 +327,16 @@ describe('XAdapter', () => {
     });
 
     it('returns false on error', async () => {
-      mockFetch.mockImplementation(async () => createMockResponse({}, false, 401));
+      mockFetch.mockImplementation(async () =>
+        createMockResponse({}, false, 401),
+      );
       expect(await adapter.healthCheck()).toBe(false);
     });
   });
 
   describe('estimateCost()', () => {
     it('returns non-zero cost for enrichment', () => {
-      const estimate = adapter.estimateCost(searchConfig);
+      const estimate = adapter.estimateCost({ maxCandidates: 50 });
       expect(estimate.estimatedCost).toBeGreaterThan(0);
       expect(estimate.currency).toBe('USD');
       expect(estimate.enrichCount).toBe(50);
@@ -312,6 +349,53 @@ describe('XAdapter', () => {
       const gen = adapter.search({} as never);
       await expect(gen.next()).rejects.toThrow('enrichment-only');
     });
+  });
+});
+
+describe('XClient API contract validation (H-11)', () => {
+  it('throws ApiContractError with the missing field path', async () => {
+    mockFetch.mockImplementation(async () =>
+      createMockResponse({
+        data: {
+          ...mockXUser,
+          public_metrics: {
+            following_count: 800,
+            tweet_count: 12000,
+          },
+        },
+      }),
+    );
+
+    const client = new XClient('test-token', 'pro');
+    const error = await client
+      .fetchUser('alexdev')
+      .catch((err: unknown) => err);
+
+    expect(error).toBeInstanceOf(ApiContractError);
+    expect(error).toMatchObject({
+      adapter: 'x',
+      fieldPaths: ['data.public_metrics.followers_count'],
+    });
+  });
+
+  it('warns on unknown fields without rejecting the response', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockFetch.mockImplementation(async () =>
+      createMockResponse({
+        data: {
+          ...mockXUser,
+          profile_banner_url: 'https://x.com/banner.jpg',
+        },
+      }),
+    );
+
+    const client = new XClient('test-token', 'pro');
+    await expect(client.fetchUser('alexdev')).resolves.toMatchObject({
+      username: 'alexdev',
+    });
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('data.profile_banner_url'),
+    );
   });
 });
 
@@ -346,14 +430,18 @@ describe('Parsers', () => {
 
     it('includes follower count in evidence', () => {
       const evidence = buildProfileEvidence(mockXUser, profileUrl);
-      const followers = evidence.find((e) => e.claim.includes('followers on X'));
+      const followers = evidence.find((e) =>
+        e.claim.includes('followers on X'),
+      );
       expect(followers).toBeDefined();
       expect(followers!.claim).toContain('5000');
     });
 
     it('includes location when available', () => {
       const evidence = buildProfileEvidence(mockXUser, profileUrl);
-      const location = evidence.find((e) => e.claim.includes('Location from X'));
+      const location = evidence.find((e) =>
+        e.claim.includes('Location from X'),
+      );
       expect(location).toBeDefined();
       expect(location!.claim).toContain('San Francisco');
     });
@@ -361,7 +449,9 @@ describe('Parsers', () => {
     it('omits location when not available', () => {
       const userNoLocation: XUser = { ...mockXUser, location: undefined };
       const evidence = buildProfileEvidence(userNoLocation, profileUrl);
-      const location = evidence.find((e) => e.claim.includes('Location from X'));
+      const location = evidence.find((e) =>
+        e.claim.includes('Location from X'),
+      );
       expect(location).toBeUndefined();
     });
   });
@@ -369,7 +459,9 @@ describe('Parsers', () => {
   describe('buildTweetEvidence()', () => {
     it('calculates engagement metrics correctly', () => {
       const evidence = buildTweetEvidence(mockXTweets, profileUrl, 5000);
-      const engagement = evidence.find((e) => e.claim.includes('engagement rate'));
+      const engagement = evidence.find((e) =>
+        e.claim.includes('engagement rate'),
+      );
       expect(engagement).toBeDefined();
       // Average engagement: sum(likes + retweets) / 10 tweets / 5000 followers * 100
       // (150+30 + 45+8 + 200+40 + 80+5 + 500+100 + 120+25 + 90+15 + 300+60 + 40+3 + 65+10) / 10 / 5000 * 100
@@ -408,7 +500,9 @@ describe('Parsers', () => {
 
     it('includes recent activity date', () => {
       const evidence = buildTweetEvidence(mockXTweets, profileUrl, 5000);
-      const activity = evidence.find((e) => e.claim.includes('Last X post was'));
+      const activity = evidence.find((e) =>
+        e.claim.includes('Last X post was'),
+      );
       expect(activity).toBeDefined();
       expect(activity!.claim).toContain('2026-03-20');
     });
@@ -422,6 +516,8 @@ describe('Rate limiting', () => {
     // Basic: 5 req/min, Pro: 60 req/min
     expect(basic.rateLimits.requestsPerMinute).toBe(5);
     expect(pro.rateLimits.requestsPerMinute).toBe(60);
-    expect(basic.rateLimits.requestsPerMinute!).toBeLessThan(pro.rateLimits.requestsPerMinute!);
+    expect(basic.rateLimits.requestsPerMinute!).toBeLessThan(
+      pro.rateLimits.requestsPerMinute!,
+    );
   });
 });

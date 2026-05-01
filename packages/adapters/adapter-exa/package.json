@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@sourcerer/core": "workspace:*",
-    "exa-js": "^2.8.0"
+    "exa-js": "^2.8.0",
+    "zod": "^3.24.0"
   }
 }

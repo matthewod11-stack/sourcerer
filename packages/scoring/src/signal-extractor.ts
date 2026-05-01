@@ -8,10 +8,14 @@ import type {
   EvidenceItem,
   TokenUsage,
 } from '@sourcerer/core';
+import type { PromptMetadata } from '@sourcerer/ai';
 import { sanitizeUntrustedText } from '@sourcerer/core';
 import { renderTemplate } from '@sourcerer/ai';
 import { ExtractedSignalsSchema } from './schemas.js';
-import { validateGrounding, type GroundingResult } from './grounding-validator.js';
+import {
+  validateGrounding,
+  type GroundingResult,
+} from './grounding-validator.js';
 
 export interface ExtractSignalsOptions {
   /** Override model for the LLM call */
@@ -24,6 +28,7 @@ export interface SignalExtractionResult {
   signals: ExtractedSignals;
   grounding: GroundingResult;
   usage: TokenUsage;
+  prompt: PromptMetadata;
 }
 
 /**
@@ -116,21 +121,28 @@ export async function extractSignals(
   const prompt = await renderTemplate('scoring-signal-extract', templateVars);
 
   // Call LLM with structured output
-  const { data: rawSignals, usage } = await provider.structuredOutput<ExtractedSignals>(
-    [{ role: 'user', content: prompt }],
-    {
-      schema: ExtractedSignalsSchema,
-      temperature: options?.temperature ?? 0.2,
-      model: options?.model,
-    },
-  );
+  const { data: rawSignals, usage } =
+    await provider.structuredOutput<ExtractedSignals>(
+      [{ role: 'user', content: prompt.content }],
+      {
+        schema: ExtractedSignalsSchema,
+        temperature: options?.temperature ?? 0.2,
+        model: options?.model,
+      },
+    );
 
   // Validate evidence grounding
   const grounding = validateGrounding(rawSignals, canonicalIds);
 
   return {
-    signals: grounding.validated,
+    signals: {
+      ...grounding.validated,
+      promptVersions: {
+        [prompt.metadata.name]: prompt.metadata.version,
+      },
+    },
     grounding,
     usage,
+    prompt: prompt.metadata,
   };
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtemp, rm, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -23,10 +23,17 @@ import {
   type EnrichmentResult,
   type CostEstimate,
   type RateLimitConfig,
+  type AIProvider,
+  type ExtractedSignals,
 } from '@sourcerer/core';
 import { JsonOutputAdapter } from '@sourcerer/output-json';
 import { MarkdownOutputAdapter } from '@sourcerer/output-markdown';
-import { createStubScoreHandler, createOutputHandler, createEnrichHandler } from '../handlers.js';
+import {
+  createScoreHandler,
+  createStubScoreHandler,
+  createOutputHandler,
+  createEnrichHandler,
+} from '../handlers.js';
 
 // --- Test Fixtures ---
 
@@ -35,9 +42,7 @@ const searchConfig: SearchConfig = {
   tiers: [
     {
       priority: 1,
-      queries: [
-        { text: 'senior backend engineer DeFi', maxResults: 5 },
-      ],
+      queries: [{ text: 'senior backend engineer DeFi', maxResults: 5 }],
     },
   ],
   scoringWeights: {
@@ -91,7 +96,12 @@ function makeRawCandidate(
   email?: string,
 ): RawCandidate {
   const now = '2026-03-24T00:00:00Z';
-  const evInput = { adapter, source: `https://${name.toLowerCase().replace(' ', '')}.dev`, claim: `${name} is an engineer`, retrievedAt: now };
+  const evInput = {
+    adapter,
+    source: `https://${name.toLowerCase().replace(' ', '')}.dev`,
+    claim: `${name} is an engineer`,
+    retrievedAt: now,
+  };
   return {
     name,
     identifiers: [
@@ -139,7 +149,10 @@ function mockDiscoverHandler(
   };
 }
 
-function mockEnrichHandler(): PhaseHandler<DedupPhaseOutput, EnrichPhaseOutput> {
+function mockEnrichHandler(): PhaseHandler<
+  DedupPhaseOutput,
+  EnrichPhaseOutput
+> {
   return {
     async execute(input) {
       // Add a mock GitHub evidence item to each candidate
@@ -197,7 +210,9 @@ const testCandidates = [
 
 function buildPipeline(
   rawCandidates: RawCandidate[] = testCandidates,
-  outputAdapters: import('@sourcerer/core').OutputAdapter[] = [new JsonOutputAdapter()],
+  outputAdapters: import('@sourcerer/core').OutputAdapter[] = [
+    new JsonOutputAdapter(),
+  ],
 ) {
   return new PipelineRunner({
     discover: mockDiscoverHandler(rawCandidates),
@@ -342,7 +357,7 @@ describe('End-to-End Pipeline', () => {
   });
 
   it('handles empty search results gracefully', async () => {
-    const runner = buildPipeline([]);  // empty candidates
+    const runner = buildPipeline([]); // empty candidates
     const meta = await runner.run({
       roleName: 'Senior Backend Engineer',
       runsBaseDir: testDir,
@@ -424,9 +439,17 @@ describe('End-to-End Pipeline', () => {
 
 function makeMockAdapter(
   name: string,
-  options?: { shouldFail?: boolean; costPerCandidate?: number; evidenceCount?: number },
+  options?: {
+    shouldFail?: boolean;
+    costPerCandidate?: number;
+    evidenceCount?: number;
+  },
 ): DataSource {
-  const { shouldFail = false, costPerCandidate = 0, evidenceCount = 1 } = options ?? {};
+  const {
+    shouldFail = false,
+    costPerCandidate = 0,
+    evidenceCount = 1,
+  } = options ?? {};
   const now = '2026-03-25T00:00:00Z';
 
   return {
@@ -439,7 +462,12 @@ function makeMockAdapter(
     async enrich(candidate: Candidate): Promise<EnrichmentResult> {
       if (shouldFail) throw new Error(`${name} failed`);
       const evidence = Array.from({ length: evidenceCount }, (_, i) => ({
-        id: generateEvidenceId({ adapter: name, source: `https://${name}.test`, claim: `claim-${i}`, retrievedAt: now }),
+        id: generateEvidenceId({
+          adapter: name,
+          source: `https://${name}.test`,
+          claim: `claim-${i}`,
+          retrievedAt: now,
+        }),
         claim: `${name} claim ${i} for ${candidate.name}`,
         source: `https://${name}.test`,
         adapter: name,
@@ -450,28 +478,68 @@ function makeMockAdapter(
         adapter: name,
         candidateId: candidate.id,
         evidence,
-        piiFields: name === 'hunter' ? [{ value: `${candidate.name.toLowerCase().replace(' ', '.')}@test.com`, type: 'email' as const, adapter: 'hunter', collectedAt: now }] : [],
-        sourceData: { adapter: name, retrievedAt: now, urls: [`https://${name}.test`] },
+        piiFields:
+          name === 'hunter'
+            ? [
+                {
+                  value: `${candidate.name.toLowerCase().replace(' ', '.')}@test.com`,
+                  type: 'email' as const,
+                  adapter: 'hunter',
+                  collectedAt: now,
+                },
+              ]
+            : [],
+        sourceData: {
+          adapter: name,
+          retrievedAt: now,
+          urls: [`https://${name}.test`],
+        },
         enrichedAt: now,
       };
     },
-    async enrichBatch(candidates: Candidate[]): Promise<BatchResult<EnrichmentResult>> {
+    async enrichBatch(
+      candidates: Candidate[],
+    ): Promise<BatchResult<EnrichmentResult>> {
       const succeeded: { candidateId: string; result: EnrichmentResult }[] = [];
-      const failed: { candidateId: string; error: Error; retryable: boolean }[] = [];
+      const failed: {
+        candidateId: string;
+        error: Error;
+        retryable: boolean;
+      }[] = [];
       for (const c of candidates) {
         try {
           const result = await this.enrich(c);
           succeeded.push({ candidateId: c.id, result });
         } catch (err) {
-          failed.push({ candidateId: c.id, error: err instanceof Error ? err : new Error(String(err)), retryable: false });
+          failed.push({
+            candidateId: c.id,
+            error: err instanceof Error ? err : new Error(String(err)),
+            retryable: false,
+          });
         }
       }
-      return { succeeded, failed, costIncurred: succeeded.length * costPerCandidate };
+      return {
+        succeeded,
+        failed,
+        costIncurred: succeeded.length * costPerCandidate,
+      };
     },
-    async healthCheck() { return !shouldFail; },
-    estimateCost(): CostEstimate {
-      return { estimatedCost: costPerCandidate, breakdown: {}, searchCount: 0, enrichCount: 1, currency: 'USD' };
+    async healthCheck() {
+      return !shouldFail;
     },
+    estimateCost: vi.fn(
+      (input: SearchConfig | { maxCandidates: number }): CostEstimate => {
+        const enrichCount = input.maxCandidates ?? 1;
+        const estimatedCost = enrichCount * costPerCandidate;
+        return {
+          estimatedCost,
+          breakdown: {},
+          searchCount: 0,
+          enrichCount,
+          currency: 'USD',
+        };
+      },
+    ),
   };
 }
 
@@ -480,9 +548,7 @@ describe('Enrichment Orchestrator', () => {
     const github = makeMockAdapter('github', { evidenceCount: 2 });
     const x = makeMockAdapter('x', { evidenceCount: 1 });
 
-    const handler = createEnrichHandler(
-      { github, x } as any,
-    );
+    const handler = createEnrichHandler({ github, x } as any);
 
     const runner = new PipelineRunner({
       discover: mockDiscoverHandler(testCandidates),
@@ -520,14 +586,17 @@ describe('Enrichment Orchestrator', () => {
       ...searchConfig,
       enrichmentPriority: [
         { adapter: 'github', required: true, runCondition: 'always' },
-        { adapter: 'hunter', required: false, runCondition: 'if_cheap_insufficient' },
+        {
+          adapter: 'hunter',
+          required: false,
+          runCondition: 'if_cheap_insufficient',
+        },
       ],
     };
 
-    const handler = createEnrichHandler(
-      { github, hunter } as any,
-      { enrichmentPriority: configWithConditional.enrichmentPriority },
-    );
+    const handler = createEnrichHandler({ github, hunter } as any, {
+      enrichmentPriority: configWithConditional.enrichmentPriority,
+    });
 
     const runner = new PipelineRunner({
       discover: mockDiscoverHandler(testCandidates),
@@ -582,7 +651,9 @@ describe('Enrichment Orchestrator', () => {
     });
 
     // Read candidates from first run
-    const json1 = JSON.parse(await readFile(join(meta1.runDir, 'candidates.json'), 'utf-8'));
+    const json1 = JSON.parse(
+      await readFile(join(meta1.runDir, 'candidates.json'), 'utf-8'),
+    );
     for (const c of json1.candidates) {
       // Each candidate should have github enrichment
       expect(c.enrichments).toHaveProperty('github');
@@ -595,9 +666,7 @@ describe('Enrichment Orchestrator', () => {
     const github = makeMockAdapter('github', { evidenceCount: 2 });
     const x = makeMockAdapter('x', { shouldFail: true });
 
-    const handler = createEnrichHandler(
-      { github, x } as any,
-    );
+    const handler = createEnrichHandler({ github, x } as any);
 
     const runner = new PipelineRunner({
       discover: mockDiscoverHandler(testCandidates),
@@ -626,23 +695,102 @@ describe('Enrichment Orchestrator', () => {
     }
   });
 
+  it('passes minimal enrichment cost input to the budget gate', async () => {
+    const hunter = makeMockAdapter('hunter', { costPerCandidate: 0.01 });
+    const handler = createEnrichHandler({ hunter } as any, { maxCostUsd: 1 });
+
+    const dedupResult = await createDedupHandler().execute(
+      { rawCandidates: testCandidates, costIncurred: 0 },
+      {} as PipelineContext,
+    );
+    expect(dedupResult.status).toBe('completed');
+    const dedupOutput = dedupResult.data!;
+
+    await handler.execute(dedupOutput, {} as PipelineContext);
+
+    expect(hunter.estimateCost).toHaveBeenCalledWith({
+      maxCandidates: dedupOutput.candidates.length,
+    });
+    expect(hunter.estimateCost).not.toHaveBeenCalledWith(
+      expect.objectContaining({ roleName: expect.any(String) }),
+    );
+  });
+
+  it('records scoring prompt versions in output candidates', async () => {
+    const dedupResult = await createDedupHandler().execute(
+      { rawCandidates: testCandidates, costIncurred: 0 },
+      {} as PipelineContext,
+    );
+    expect(dedupResult.status).toBe('completed');
+    const candidate = dedupResult.data!.candidates[0];
+    const evidenceId = candidate.evidence[0].id;
+    const signals: ExtractedSignals = {
+      technicalDepth: { score: 82, evidenceIds: [evidenceId], confidence: 0.9 },
+      domainRelevance: {
+        score: 75,
+        evidenceIds: [evidenceId],
+        confidence: 0.8,
+      },
+      trajectoryMatch: {
+        score: 68,
+        evidenceIds: [evidenceId],
+        confidence: 0.7,
+      },
+      cultureFit: { score: 60, evidenceIds: [evidenceId], confidence: 0.6 },
+      reachability: { score: 90, evidenceIds: [evidenceId], confidence: 0.95 },
+      redFlags: [],
+    };
+    const usage = {
+      inputTokens: 0,
+      outputTokens: 0,
+      cachedTokens: 0,
+      model: 'mock',
+    };
+    const provider: AIProvider = {
+      name: 'mock',
+      structuredOutput: vi.fn().mockResolvedValue({ data: signals, usage }),
+      chat: vi.fn().mockResolvedValue({ content: 'Narrative', usage }),
+    };
+
+    const handler = createScoreHandler(searchConfig, talentProfile, provider);
+    const result = await handler.execute(
+      { candidates: [candidate], costIncurred: 0 },
+      {} as PipelineContext,
+    );
+
+    expect(result.status).toBe('completed');
+    expect(result.data!.candidates[0].signals.promptVersions).toEqual({
+      'scoring-signal-extract': 2,
+    });
+    expect(result.data!.candidates[0].score.promptVersions).toEqual({
+      'scoring-signal-extract': 2,
+      'scoring-narrative': 2,
+    });
+  });
+
   it('runs expensive adapters when cheap signal is insufficient', async () => {
     // GitHub provides only 1 evidence item (insufficient — need 3)
     const github = makeMockAdapter('github', { evidenceCount: 1 });
-    const hunter = makeMockAdapter('hunter', { costPerCandidate: 0.05, evidenceCount: 1 });
+    const hunter = makeMockAdapter('hunter', {
+      costPerCandidate: 0.05,
+      evidenceCount: 1,
+    });
 
     const configWithConditional: SearchConfig = {
       ...searchConfig,
       enrichmentPriority: [
         { adapter: 'github', required: true, runCondition: 'always' },
-        { adapter: 'hunter', required: false, runCondition: 'if_cheap_insufficient' },
+        {
+          adapter: 'hunter',
+          required: false,
+          runCondition: 'if_cheap_insufficient',
+        },
       ],
     };
 
-    const handler = createEnrichHandler(
-      { github, hunter } as any,
-      { enrichmentPriority: configWithConditional.enrichmentPriority },
-    );
+    const handler = createEnrichHandler({ github, hunter } as any, {
+      enrichmentPriority: configWithConditional.enrichmentPriority,
+    });
 
     const runner = new PipelineRunner({
       discover: mockDiscoverHandler(testCandidates),

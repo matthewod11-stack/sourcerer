@@ -11,7 +11,11 @@ import {
   writeRunMeta,
   writeArtifact,
 } from '../run-artifacts.js';
-import { saveCheckpoint, loadCheckpoint, createCheckpoint } from '../checkpoint.js';
+import {
+  saveCheckpoint,
+  loadCheckpoint,
+  createCheckpoint,
+} from '../checkpoint.js';
 import type {
   PipelineHandlers,
   PipelineRunConfig,
@@ -28,6 +32,7 @@ import type {
 } from '../pipeline-types.js';
 import type { RawCandidate, ScoredCandidate } from '../candidate.js';
 import type { ObservedIdentifier } from '../identity.js';
+import type { SourcererLogger } from '../logger.js';
 
 // --- Helpers ---
 
@@ -43,11 +48,21 @@ afterEach(async () => {
 
 const now = '2026-03-23T12:00:00Z';
 
-function makeRawCandidate(name: string, adapter: string, email: string): RawCandidate {
+function makeRawCandidate(
+  name: string,
+  adapter: string,
+  email: string,
+): RawCandidate {
   return {
     name,
     identifiers: [
-      { type: 'email', value: email, source: adapter, observedAt: now, confidence: 'high' } as ObservedIdentifier,
+      {
+        type: 'email',
+        value: email,
+        source: adapter,
+        observedAt: now,
+        confidence: 'high',
+      } as ObservedIdentifier,
     ],
     sourceData: { adapter, retrievedAt: now, urls: [] },
     evidence: [],
@@ -106,7 +121,7 @@ function makeMockDiscoverOutput(): DiscoverPhaseOutput {
       makeRawCandidate('Sarah Chen', 'exa', 'sarah@test.com'),
       makeRawCandidate('John Smith', 'exa', 'john@test.com'),
     ],
-    costIncurred: 1.50,
+    costIncurred: 1.5,
   };
 }
 
@@ -121,7 +136,7 @@ function makeSimpleHandlers(): PipelineHandlers {
     },
     discover: {
       async execute() {
-        return { status: 'completed', data: discover, costIncurred: 1.50 };
+        return { status: 'completed', data: discover, costIncurred: 1.5 };
       },
     },
     dedup: createDedupHandler(),
@@ -129,8 +144,8 @@ function makeSimpleHandlers(): PipelineHandlers {
       async execute(input: DedupPhaseOutput) {
         return {
           status: 'completed',
-          data: { candidates: input.candidates, costIncurred: 0.50 },
-          costIncurred: 0.50,
+          data: { candidates: input.candidates, costIncurred: 0.5 },
+          costIncurred: 0.5,
         };
       },
     },
@@ -150,18 +165,55 @@ function makeSimpleHandlers(): PipelineHandlers {
           narrative: 'Test narrative.',
           tier: 1 as const,
         }));
-        return { status: 'completed', data: { candidates: scored, costIncurred: 0.25 }, costIncurred: 0.25 };
+        return {
+          status: 'completed',
+          data: { candidates: scored, costIncurred: 0.25 },
+          costIncurred: 0.25,
+        };
       },
     },
     output: {
       async execute() {
         return {
           status: 'completed',
-          data: { outputLocations: { json: 'candidates.json' }, candidatesPushed: 2 },
+          data: {
+            outputLocations: { json: 'candidates.json' },
+            candidatesPushed: 2,
+          },
         };
       },
     },
   };
+}
+
+function captureLoggerEvents(): {
+  logger: SourcererLogger;
+  events: Array<{
+    level: string;
+    event: string;
+    fields: Record<string, unknown>;
+  }>;
+} {
+  const events: Array<{
+    level: string;
+    event: string;
+    fields: Record<string, unknown>;
+  }> = [];
+  const logger: SourcererLogger = {
+    debug(event, fields) {
+      events.push({ level: 'debug', event, fields });
+    },
+    info(event, fields) {
+      events.push({ level: 'info', event, fields });
+    },
+    warn(event, fields) {
+      events.push({ level: 'warn', event, fields });
+    },
+    error(event, fields) {
+      events.push({ level: 'error', event, fields });
+    },
+  };
+  return { logger, events };
 }
 
 // --- CostTracker Tests ---
@@ -169,44 +221,44 @@ function makeSimpleHandlers(): PipelineHandlers {
 describe('CostTracker', () => {
   it('accumulates per-phase costs', () => {
     const tracker = new CostTracker();
-    tracker.recordCost('discover', 1.50);
-    tracker.recordCost('enrich', 0.50);
+    tracker.recordCost('discover', 1.5);
+    tracker.recordCost('enrich', 0.5);
     const snap = tracker.snapshot();
-    expect(snap.totalCost).toBe(2.00);
-    expect(snap.perPhase.discover).toBe(1.50);
-    expect(snap.perPhase.enrich).toBe(0.50);
+    expect(snap.totalCost).toBe(2.0);
+    expect(snap.perPhase.discover).toBe(1.5);
+    expect(snap.perPhase.enrich).toBe(0.5);
   });
 
   it('accumulates per-adapter costs', () => {
     const tracker = new CostTracker();
-    tracker.recordCost('discover', 1.00, 'exa');
-    tracker.recordCost('enrich', 0.30, 'github');
-    tracker.recordCost('enrich', 0.20, 'hunter');
+    tracker.recordCost('discover', 1.0, 'exa');
+    tracker.recordCost('enrich', 0.3, 'github');
+    tracker.recordCost('enrich', 0.2, 'hunter');
     const snap = tracker.snapshot();
-    expect(snap.perAdapter.exa).toBe(1.00);
-    expect(snap.perAdapter.github).toBe(0.30);
-    expect(snap.perAdapter.hunter).toBe(0.20);
+    expect(snap.perAdapter.exa).toBe(1.0);
+    expect(snap.perAdapter.github).toBe(0.3);
+    expect(snap.perAdapter.hunter).toBe(0.2);
   });
 
   it('detects budget exceeded', () => {
     const tracker = new CostTracker();
-    tracker.recordCost('discover', 4.00);
-    expect(tracker.exceedsBudget(5.00)).toBe(false);
-    tracker.recordCost('enrich', 2.00);
-    expect(tracker.exceedsBudget(5.00)).toBe(true);
+    tracker.recordCost('discover', 4.0);
+    expect(tracker.exceedsBudget(5.0)).toBe(false);
+    tracker.recordCost('enrich', 2.0);
+    expect(tracker.exceedsBudget(5.0)).toBe(true);
   });
 
   it('restores from snapshot', () => {
     const tracker = new CostTracker();
     tracker.restoreFrom({
-      totalCost: 3.00,
-      perPhase: { discover: 2.00, enrich: 1.00 },
-      perAdapter: { exa: 2.00 },
+      totalCost: 3.0,
+      perPhase: { discover: 2.0, enrich: 1.0 },
+      perAdapter: { exa: 2.0 },
       currency: 'USD',
     });
-    expect(tracker.snapshot().totalCost).toBe(3.00);
-    tracker.recordCost('score', 0.50);
-    expect(tracker.snapshot().totalCost).toBe(3.50);
+    expect(tracker.snapshot().totalCost).toBe(3.0);
+    tracker.recordCost('score', 0.5);
+    expect(tracker.snapshot().totalCost).toBe(3.5);
   });
 });
 
@@ -214,7 +266,10 @@ describe('CostTracker', () => {
 
 describe('Run Artifacts', () => {
   it('generates run dir name in correct format', () => {
-    const name = generateRunDirName('Senior Backend Engineer', new Date('2026-03-23'));
+    const name = generateRunDirName(
+      'Senior Backend Engineer',
+      new Date('2026-03-23'),
+    );
     expect(name).toBe('2026-03-23-senior-backend-engineer');
   });
 
@@ -249,7 +304,9 @@ describe('Run Artifacts', () => {
       version: 1,
     };
     await writeRunMeta(runDir, meta);
-    const content = JSON.parse(await readFile(join(runDir, 'run-meta.json'), 'utf-8'));
+    const content = JSON.parse(
+      await readFile(join(runDir, 'run-meta.json'), 'utf-8'),
+    );
     expect(content.runId).toBe('test-id');
   });
 
@@ -300,7 +357,12 @@ describe('Checkpoint', () => {
       startedAt: now,
       status: 'running',
       phases: [],
-      cost: { totalCost: 1.50, perPhase: { discover: 1.50 }, perAdapter: { exa: 1.50 }, currency: 'USD' },
+      cost: {
+        totalCost: 1.5,
+        perPhase: { discover: 1.5 },
+        perAdapter: { exa: 1.5 },
+        currency: 'USD',
+      },
       version: 1,
     };
     const cp = createCheckpoint('cp-test', runDir, 'dedup', {}, meta);
@@ -335,7 +397,24 @@ describe('PipelineRunner', () => {
         dedup: {
           async execute(input: DiscoverPhaseOutput) {
             phases.push('dedup');
-            return { status: 'completed', data: { candidates: [], resolveResult: { candidates: [], mergeLog: [], pendingMerges: [], stats: { inputCount: 0, outputCount: 0, highConfidenceMerges: 0, mediumConfidenceMerges: 0, lowConfidenceMerges: 0 } } } };
+            return {
+              status: 'completed',
+              data: {
+                candidates: [],
+                resolveResult: {
+                  candidates: [],
+                  mergeLog: [],
+                  pendingMerges: [],
+                  stats: {
+                    inputCount: 0,
+                    outputCount: 0,
+                    highConfidenceMerges: 0,
+                    mediumConfidenceMerges: 0,
+                    lowConfidenceMerges: 0,
+                  },
+                },
+              },
+            };
           },
         },
       };
@@ -403,6 +482,55 @@ describe('PipelineRunner', () => {
       expect(events.length).toBeGreaterThanOrEqual(2); // at least running + completed
       expect(events.some((e) => e.status === 'running')).toBe(true);
     });
+
+    it('emits structured phase telemetry with duration and cost', async () => {
+      const { logger, events } = captureLoggerEvents();
+      const runner = new PipelineRunner({
+        intake: {
+          async execute() {
+            return { status: 'completed', data: makeMockIntakeOutput() };
+          },
+        },
+        discover: {
+          async execute() {
+            return {
+              status: 'completed',
+              data: makeMockDiscoverOutput(),
+              costIncurred: 1.5,
+            };
+          },
+        },
+      });
+
+      await runner.run({ roleName: 'Test', runsBaseDir: tmpDir, logger });
+
+      const phaseStarts = events.filter(
+        (entry) => entry.event === 'phase.start',
+      );
+      const phaseEnds = events.filter((entry) => entry.event === 'phase.end');
+      expect(phaseStarts.map((entry) => entry.fields.phase)).toContain(
+        'discover',
+      );
+      expect(phaseEnds.map((entry) => entry.fields.phase)).toContain(
+        'discover',
+      );
+
+      const discoverEnd = phaseEnds.find(
+        (entry) => entry.fields.phase === 'discover',
+      );
+      expect(discoverEnd?.fields).toMatchObject({
+        status: 'completed',
+        costIncurredUsd: 1.5,
+        totalCostUsd: 1.5,
+      });
+      expect(typeof discoverEnd?.fields.durationMs).toBe('number');
+      expect(events.some((entry) => entry.event === 'checkpoint.saved')).toBe(
+        true,
+      );
+      expect(events.some((entry) => entry.event === 'cost.incurred')).toBe(
+        true,
+      );
+    });
   });
 
   describe('Partial failure', () => {
@@ -417,9 +545,16 @@ describe('PipelineRunner', () => {
           async execute() {
             return {
               status: 'partial' as const,
-              partialData: { rawCandidates: [makeRawCandidate('Sarah', 'exa', 'sarah@test.com')], costIncurred: 1.00 },
-              failures: [{ item: 'query-2', error: 'Exa rate limit', retryable: true }],
-              costIncurred: 1.00,
+              partialData: {
+                rawCandidates: [
+                  makeRawCandidate('Sarah', 'exa', 'sarah@test.com'),
+                ],
+                costIncurred: 1.0,
+              },
+              failures: [
+                { item: 'query-2', error: 'Exa rate limit', retryable: true },
+              ],
+              costIncurred: 1.0,
             };
           },
         },
@@ -503,7 +638,10 @@ describe('PipelineRunner', () => {
       };
 
       const runner1 = new PipelineRunner(firstHandlers);
-      const meta1 = await runner1.run({ roleName: 'Test', runsBaseDir: tmpDir });
+      const meta1 = await runner1.run({
+        roleName: 'Test',
+        runsBaseDir: tmpDir,
+      });
 
       // Second run: resume with dedup handler added
       const phases: string[] = [];
@@ -528,8 +666,16 @@ describe('PipelineRunner', () => {
               data: {
                 candidates: [],
                 resolveResult: {
-                  candidates: [], mergeLog: [], pendingMerges: [],
-                  stats: { inputCount: 0, outputCount: 0, highConfidenceMerges: 0, mediumConfidenceMerges: 0, lowConfidenceMerges: 0 },
+                  candidates: [],
+                  mergeLog: [],
+                  pendingMerges: [],
+                  stats: {
+                    inputCount: 0,
+                    outputCount: 0,
+                    highConfidenceMerges: 0,
+                    mediumConfidenceMerges: 0,
+                    lowConfidenceMerges: 0,
+                  },
                 },
               },
             };
@@ -560,7 +706,11 @@ describe('PipelineRunner', () => {
         },
         discover: {
           async execute() {
-            return { status: 'completed', data: makeMockDiscoverOutput(), costIncurred: 2.50 };
+            return {
+              status: 'completed',
+              data: makeMockDiscoverOutput(),
+              costIncurred: 2.5,
+            };
           },
         },
       };
@@ -568,8 +718,8 @@ describe('PipelineRunner', () => {
       const runner = new PipelineRunner(handlers);
       const meta = await runner.run({ roleName: 'Test', runsBaseDir: tmpDir });
 
-      expect(meta.cost.totalCost).toBe(2.50);
-      expect(meta.cost.perPhase.discover).toBe(2.50);
+      expect(meta.cost.totalCost).toBe(2.5);
+      expect(meta.cost.perPhase.discover).toBe(2.5);
     });
 
     it('aborts when budget exceeded', async () => {
@@ -581,7 +731,11 @@ describe('PipelineRunner', () => {
         },
         discover: {
           async execute() {
-            return { status: 'completed', data: makeMockDiscoverOutput(), costIncurred: 10.00 };
+            return {
+              status: 'completed',
+              data: makeMockDiscoverOutput(),
+              costIncurred: 10.0,
+            };
           },
         },
         dedup: createDedupHandler(),
@@ -589,7 +743,7 @@ describe('PipelineRunner', () => {
 
       const runner = new PipelineRunner(handlers);
       await expect(
-        runner.run({ roleName: 'Test', runsBaseDir: tmpDir, maxCostUsd: 5.00 }),
+        runner.run({ roleName: 'Test', runsBaseDir: tmpDir, maxCostUsd: 5.0 }),
       ).rejects.toThrow('Budget exceeded');
     });
   });
@@ -625,7 +779,10 @@ describe('PipelineRunner', () => {
   describe('End-to-end with full mock pipeline', () => {
     it('produces correct run-meta.json for a complete run', async () => {
       const runner = new PipelineRunner(makeSimpleHandlers());
-      const meta = await runner.run({ roleName: 'Senior Backend Engineer', runsBaseDir: tmpDir });
+      const meta = await runner.run({
+        roleName: 'Senior Backend Engineer',
+        runsBaseDir: tmpDir,
+      });
 
       expect(meta.status).toBe('completed');
       expect(meta.roleName).toBe('Senior Backend Engineer');

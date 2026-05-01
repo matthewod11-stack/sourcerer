@@ -55,7 +55,11 @@ describe('calculateScore', () => {
 
   it('builds ScoreComponent with correct fields per dimension', () => {
     const signals = makeSignals({
-      technicalDepth: { score: 70, evidenceIds: ['ev-001', 'ev-002'], confidence: 0.85 },
+      technicalDepth: {
+        score: 70,
+        evidenceIds: ['ev-001', 'ev-002'],
+        confidence: 0.85,
+      },
     });
     const score = calculateScore(signals, weights);
 
@@ -92,7 +96,11 @@ describe('calculateScore', () => {
       cultureFit: { score: 50, evidenceIds: [], confidence: 1 },
       reachability: { score: 90, evidenceIds: [], confidence: 1 },
       redFlags: [
-        { signal: 'Frequent job hopping', evidenceId: 'ev-001', severity: 'medium' },
+        {
+          signal: 'Frequent job hopping',
+          evidenceId: 'ev-001',
+          severity: 'medium',
+        },
         { signal: 'No public repos', evidenceId: 'ev-002', severity: 'low' },
       ],
     });
@@ -129,9 +137,7 @@ describe('calculateScore', () => {
       trajectoryMatch: { score: 50, evidenceIds: [], confidence: 1 },
       cultureFit: { score: 50, evidenceIds: [], confidence: 1 },
       reachability: { score: 50, evidenceIds: [], confidence: 1 },
-      redFlags: [
-        { signal: 'Issue', evidenceId: 'ev-001', severity: 'high' },
-      ],
+      redFlags: [{ signal: 'Issue', evidenceId: 'ev-001', severity: 'high' }],
     });
     const score = calculateScore(signals, weights, {
       redFlagPenalties: { low: 1, medium: 3, high: 20 },
@@ -154,6 +160,114 @@ describe('calculateScore', () => {
     // Only domainRelevance contributes: 80 * 0.25 * 1 = 20
     // technicalDepth has score 90 but confidence 0 → contributes 0
     expect(score.total).toBe(20);
+  });
+
+  it('returns 0 when all dimensions have zero confidence', () => {
+    const signals = makeSignals({
+      technicalDepth: { score: 100, evidenceIds: [], confidence: 0 },
+      domainRelevance: { score: 100, evidenceIds: [], confidence: 0 },
+      trajectoryMatch: { score: 100, evidenceIds: [], confidence: 0 },
+      cultureFit: { score: 100, evidenceIds: [], confidence: 0 },
+      reachability: { score: 100, evidenceIds: [], confidence: 0 },
+    });
+
+    expect(calculateScore(signals, weights).total).toBe(0);
+  });
+
+  it('allows negative weights to reduce the score when configured', () => {
+    const signals = makeSignals({
+      technicalDepth: { score: 100, evidenceIds: [], confidence: 1 },
+      domainRelevance: { score: 100, evidenceIds: [], confidence: 1 },
+      trajectoryMatch: { score: 0, evidenceIds: [], confidence: 1 },
+      cultureFit: { score: 0, evidenceIds: [], confidence: 1 },
+      reachability: { score: 0, evidenceIds: [], confidence: 1 },
+    });
+    const score = calculateScore(signals, {
+      technicalDepth: 0.5,
+      domainRelevance: -0.2,
+    });
+
+    expect(score.total).toBe(30);
+    expect(
+      score.breakdown.find((c) => c.dimension === 'domainRelevance')?.weighted,
+    ).toBe(-20);
+  });
+
+  it('clamps negative weighted totals to 0', () => {
+    const signals = makeSignals({
+      technicalDepth: { score: 100, evidenceIds: [], confidence: 1 },
+      domainRelevance: { score: 0, evidenceIds: [], confidence: 1 },
+      trajectoryMatch: { score: 0, evidenceIds: [], confidence: 1 },
+      cultureFit: { score: 0, evidenceIds: [], confidence: 1 },
+      reachability: { score: 0, evidenceIds: [], confidence: 1 },
+    });
+
+    expect(calculateScore(signals, { technicalDepth: -1 }).total).toBe(0);
+  });
+
+  it('clamps totals above 100', () => {
+    const signals = makeSignals({
+      technicalDepth: { score: 100, evidenceIds: [], confidence: 1 },
+      domainRelevance: { score: 100, evidenceIds: [], confidence: 1 },
+      trajectoryMatch: { score: 100, evidenceIds: [], confidence: 1 },
+      cultureFit: { score: 100, evidenceIds: [], confidence: 1 },
+      reachability: { score: 100, evidenceIds: [], confidence: 1 },
+    });
+
+    expect(
+      calculateScore(signals, {
+        technicalDepth: 1,
+        domainRelevance: 1,
+        trajectoryMatch: 1,
+        cultureFit: 1,
+        reachability: 1,
+      }).total,
+    ).toBe(100);
+  });
+
+  it.each([
+    ['low', 2],
+    ['medium', 5],
+    ['high', 10],
+  ] as const)(
+    'deducts the default %s red-flag penalty',
+    (severity, penalty) => {
+      const signals = makeSignals({
+        technicalDepth: { score: 50, evidenceIds: [], confidence: 1 },
+        domainRelevance: { score: 50, evidenceIds: [], confidence: 1 },
+        trajectoryMatch: { score: 50, evidenceIds: [], confidence: 1 },
+        cultureFit: { score: 50, evidenceIds: [], confidence: 1 },
+        reachability: { score: 50, evidenceIds: [], confidence: 1 },
+        redFlags: [{ signal: 'Concern', evidenceId: 'ev-001', severity }],
+      });
+
+      expect(calculateScore(signals, weights).total).toBe(50 - penalty);
+    },
+  );
+
+  it('forwards hallucination penalty metadata to the score breakdown', () => {
+    const hallucinationPenalty = {
+      hallucinatedCount: 1,
+      totalCitedCount: 4,
+      penaltyApplied: 0.25,
+      rawScoreBeforePenalty: 80,
+    };
+    const score = calculateScore(
+      makeSignals({
+        technicalDepth: {
+          score: 60,
+          evidenceIds: ['ev-aaa001'],
+          confidence: 0.5,
+          hallucinationPenalty,
+        },
+      }),
+      weights,
+    );
+
+    expect(
+      score.breakdown.find((c) => c.dimension === 'technicalDepth')
+        ?.hallucinationPenalty,
+    ).toEqual(hallucinationPenalty);
   });
 
   it('preserves weights in the Score output', () => {

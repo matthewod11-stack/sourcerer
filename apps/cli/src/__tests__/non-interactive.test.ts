@@ -33,12 +33,25 @@ describe('parseArgs — new flags', () => {
     expect(result.yes).toBe(false);
     expect(result.noInteractive).toBe(false);
     expect(result.quiet).toBe(false);
+    expect(result.jsonLogs).toBe(false);
   });
 
   it('combines multiple new flags', () => {
-    const result = parseArgs(['--config', 'search.yaml', '--no-interactive', '-q']);
+    const result = parseArgs([
+      '--config',
+      'search.yaml',
+      '--no-interactive',
+      '-q',
+      '--json-logs',
+    ]);
     expect(result.noInteractive).toBe(true);
     expect(result.quiet).toBe(true);
+    expect(result.jsonLogs).toBe(true);
+  });
+
+  it('recognizes --json-logs', () => {
+    const result = parseArgs(['--config', 'search.yaml', '--json-logs']);
+    expect(result.jsonLogs).toBe(true);
   });
 });
 
@@ -72,7 +85,9 @@ describe('runCommand validation — non-interactive', () => {
     }
 
     const fullOutput = output.join('\n');
-    expect(fullOutput).toContain('--no-interactive with --intake requires --config');
+    expect(fullOutput).toContain(
+      '--no-interactive with --intake requires --config',
+    );
     expect(process.exitCode).toBe(1);
     process.exitCode = prevExitCode;
   });
@@ -101,7 +116,11 @@ describe('runCommand validation — non-interactive', () => {
   });
 
   it('--no-interactive with --resume passes validation', () => {
-    const result = parseArgs(['--no-interactive', '--resume', '/tmp/runs/some-run']);
+    const result = parseArgs([
+      '--no-interactive',
+      '--resume',
+      '/tmp/runs/some-run',
+    ]);
     expect(result.noInteractive).toBe(true);
     expect(result.resumeFrom).toBe('/tmp/runs/some-run');
   });

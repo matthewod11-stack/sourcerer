@@ -19,10 +19,15 @@ import type {
   PhaseHandler,
 } from './pipeline-types.js';
 import { PHASE_ORDER } from './pipeline-types.js';
-import { saveCheckpoint, loadCheckpoint, createCheckpoint } from './checkpoint.js';
+import {
+  saveCheckpoint,
+  loadCheckpoint,
+  createCheckpoint,
+} from './checkpoint.js';
 import { createRunDirectory, writeRunMeta } from './run-artifacts.js';
 import { CostTracker } from './cost-tracker.js';
 import { IdentityResolver } from './identity-resolver.js';
+import { createNoopLogger } from './logger.js';
 
 // Map each phase to the previous phase whose output it needs
 const PHASE_INPUT_MAP: Record<PipelinePhaseName, PipelinePhaseName | null> = {
@@ -109,11 +114,20 @@ export class PipelineRunner {
       phaseOutputs,
       costSnapshot: costTracker.snapshot(),
       retentionTtlDays: config.retentionTtlDays,
+      logger: config.logger ?? createNoopLogger(),
       onProgress: config.onProgress,
     };
+    context.logger?.info('run.start', {
+      runId,
+      runDir,
+      roleName: config.roleName,
+      resumed: Boolean(config.resumeFrom),
+      startFromPhase: config.startFromPhase ?? PHASE_ORDER[startPhaseIndex],
+    });
 
     // Execute phases
-    let lastCompletedPhase: PipelinePhaseName | undefined = checkpoint?.lastCompletedPhase;
+    let lastCompletedPhase: PipelinePhaseName | undefined =
+      checkpoint?.lastCompletedPhase;
     let pipelineFailed = false;
 
     for (let i = startPhaseIndex; i < PHASE_ORDER.length; i++) {
@@ -121,7 +135,22 @@ export class PipelineRunner {
       const handler = this.handlers[phaseName];
 
       if (!handler) {
-        this.emitProgress(context, phaseName, 'skipped', `Phase ${phaseName}: no handler, skipping`);
+        const skippedAt = new Date();
+        this.logPhaseStart(context, phaseName, skippedAt);
+        this.logPhaseEnd(context, {
+          phase: phaseName,
+          status: 'skipped',
+          startedAt: skippedAt.toISOString(),
+          completedAt: skippedAt.toISOString(),
+          durationMs: 0,
+          costIncurred: 0,
+        });
+        this.emitProgress(
+          context,
+          phaseName,
+          'skipped',
+          `Phase ${phaseName}: no handler, skipping`,
+        );
         continue;
       }
 
@@ -129,12 +158,22 @@ export class PipelineRunner {
       const input = this.resolvePhaseInput(phaseName, context);
 
       // Execute
-      this.emitProgress(context, phaseName, 'running', `Phase ${phaseName}: starting`);
+      this.emitProgress(
+        context,
+        phaseName,
+        'running',
+        `Phase ${phaseName}: starting`,
+      );
       const startTime = Date.now();
+      const startedAt = new Date(startTime);
+      this.logPhaseStart(context, phaseName, startedAt);
 
       let result: PhaseResult;
       try {
-        result = await (handler as PhaseHandler<unknown, unknown>).execute(input, context);
+        result = await (handler as PhaseHandler<unknown, unknown>).execute(
+          input,
+          context,
+        );
       } catch (err) {
         result = {
           status: 'failed',
@@ -156,11 +195,13 @@ export class PipelineRunner {
       };
 
       if (result.status === 'completed' && result.data) {
-        (context.phaseOutputs as Record<string, unknown>)[phaseName] = result.data;
+        (context.phaseOutputs as Record<string, unknown>)[phaseName] =
+          result.data;
         timing.itemsProcessed = this.countItems(phaseName, result.data);
         lastCompletedPhase = phaseName;
       } else if (result.status === 'partial' && result.partialData) {
-        (context.phaseOutputs as Record<string, unknown>)[phaseName] = result.partialData;
+        (context.phaseOutputs as Record<string, unknown>)[phaseName] =
+          result.partialData;
         timing.itemsProcessed = this.countItems(phaseName, result.partialData);
         timing.itemsFailed = result.failures?.length ?? 0;
         lastCompletedPhase = phaseName;
@@ -178,15 +219,42 @@ export class PipelineRunner {
       runMeta.cost = costTracker.snapshot();
       runMeta.lastCompletedPhase = lastCompletedPhase;
       context.costSnapshot = costTracker.snapshot();
+      if (result.costIncurred) {
+        context.logger?.info('cost.incurred', {
+          runId,
+          runDir,
+          phase: phaseName,
+          amountUsd: result.costIncurred,
+          totalCostUsd: context.costSnapshot.totalCost,
+        });
+      }
 
       // Save checkpoint and run-meta after each phase
       if (lastCompletedPhase) {
-        const cp = createCheckpoint(runId, runDir, lastCompletedPhase, context.phaseOutputs, runMeta);
+        const cp = createCheckpoint(
+          runId,
+          runDir,
+          lastCompletedPhase,
+          context.phaseOutputs,
+          runMeta,
+        );
         await saveCheckpoint(runDir, cp);
+        context.logger?.info('checkpoint.saved', {
+          runId,
+          runDir,
+          phase: phaseName,
+          lastCompletedPhase,
+        });
       }
       await writeRunMeta(runDir, runMeta);
 
-      this.emitProgress(context, phaseName, result.status, `Phase ${phaseName}: ${result.status}`);
+      this.logPhaseEnd(context, timing);
+      this.emitProgress(
+        context,
+        phaseName,
+        result.status,
+        `Phase ${phaseName}: ${result.status}`,
+      );
 
       if (pipelineFailed) break;
 
@@ -194,8 +262,15 @@ export class PipelineRunner {
       if (config.maxCostUsd && costTracker.exceedsBudget(config.maxCostUsd)) {
         runMeta.status = 'interrupted';
         runMeta.completedAt = new Date().toISOString();
-        runMeta.totalDurationMs = Date.now() - new Date(runMeta.startedAt).getTime();
+        runMeta.totalDurationMs =
+          Date.now() - new Date(runMeta.startedAt).getTime();
         await writeRunMeta(runDir, runMeta);
+        context.logger?.warn('run.budget_exceeded', {
+          runId,
+          runDir,
+          totalCostUsd: costTracker.snapshot().totalCost,
+          maxCostUsd: config.maxCostUsd,
+        });
         throw new Error(
           `Budget exceeded: $${costTracker.snapshot().totalCost.toFixed(2)} > $${config.maxCostUsd.toFixed(2)}`,
         );
@@ -205,7 +280,8 @@ export class PipelineRunner {
     // Finalize
     runMeta.status = pipelineFailed ? 'failed' : 'completed';
     runMeta.completedAt = new Date().toISOString();
-    runMeta.totalDurationMs = Date.now() - new Date(runMeta.startedAt).getTime();
+    runMeta.totalDurationMs =
+      Date.now() - new Date(runMeta.startedAt).getTime();
 
     // Count final candidates
     const scoreOutput = context.phaseOutputs.score;
@@ -219,6 +295,14 @@ export class PipelineRunner {
     }
 
     await writeRunMeta(runDir, runMeta);
+    context.logger?.info('run.end', {
+      runId,
+      runDir,
+      status: runMeta.status,
+      totalDurationMs: runMeta.totalDurationMs,
+      totalCostUsd: runMeta.cost.totalCost,
+      candidateCount: runMeta.candidateCount ?? 0,
+    });
 
     return runMeta;
   }
@@ -235,13 +319,16 @@ export class PipelineRunner {
     if (!input) {
       throw new Error(
         `Cannot run '${phaseName}' phase: no output from '${inputPhase}' phase. ` +
-        `Provide a handler for '${inputPhase}' or resume from a checkpoint that includes it.`,
+          `Provide a handler for '${inputPhase}' or resume from a checkpoint that includes it.`,
       );
     }
     return input;
   }
 
-  private countItems(phaseName: PipelinePhaseName, data: unknown): number | undefined {
+  private countItems(
+    phaseName: PipelinePhaseName,
+    data: unknown,
+  ): number | undefined {
     const d = data as Record<string, unknown>;
     if ('candidates' in d && Array.isArray(d.candidates)) {
       return d.candidates.length;
@@ -265,10 +352,54 @@ export class PipelineRunner {
       timestamp: new Date().toISOString(),
     });
   }
+
+  private logPhaseStart(
+    context: PipelineContext,
+    phase: PipelinePhaseName,
+    startedAt: Date,
+  ): void {
+    context.logger?.info('phase.start', {
+      runId: context.runId,
+      runDir: context.runDir,
+      phase,
+      startedAt: startedAt.toISOString(),
+      totalCostUsd: context.costSnapshot.totalCost,
+    });
+  }
+
+  private logPhaseEnd(
+    context: PipelineContext,
+    timing: PhaseTimingEntry,
+  ): void {
+    const fields = {
+      runId: context.runId,
+      runDir: context.runDir,
+      phase: timing.phase,
+      status: timing.status,
+      durationMs: timing.durationMs ?? 0,
+      costIncurredUsd: timing.costIncurred,
+      totalCostUsd: context.costSnapshot.totalCost,
+      itemsProcessed: timing.itemsProcessed ?? 0,
+      itemsFailed: timing.itemsFailed ?? 0,
+      error: timing.error,
+    };
+    if (timing.status === 'failed') {
+      context.logger?.error('phase.end', fields);
+      return;
+    }
+    if (timing.status === 'partial') {
+      context.logger?.warn('phase.end', fields);
+      return;
+    }
+    context.logger?.info('phase.end', fields);
+  }
 }
 
 /** Built-in dedup handler wrapping IdentityResolver */
-export function createDedupHandler(): PhaseHandler<DiscoverPhaseOutput, DedupPhaseOutput> {
+export function createDedupHandler(): PhaseHandler<
+  DiscoverPhaseOutput,
+  DedupPhaseOutput
+> {
   const resolver = new IdentityResolver();
   return {
     async execute(input) {

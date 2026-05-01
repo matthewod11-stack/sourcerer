@@ -39,6 +39,8 @@ export { computeRetentionExpiresAt } from './candidate.js';
 export type {
   RateLimitConfig,
   CostEstimate,
+  EnrichmentCostInput,
+  CostEstimateInput,
   SearchPage,
   BatchResult,
   DataSourceCapability,
@@ -105,7 +107,11 @@ export type {
 export { PHASE_ORDER } from './pipeline-types.js';
 export { PipelineRunner, createDedupHandler } from './pipeline-runner.js';
 export { CostTracker } from './cost-tracker.js';
-export { saveCheckpoint, loadCheckpoint, createCheckpoint } from './checkpoint.js';
+export {
+  saveCheckpoint,
+  loadCheckpoint,
+  createCheckpoint,
+} from './checkpoint.js';
 export {
   generateRunDirName,
   createRunDirectory,
@@ -163,3 +169,24 @@ export {
 
 // PII redaction (for any value crossing into logs, stdout, or non-storage UI)
 export { redactPII } from './pii-redact.js';
+
+// Structured logging and run telemetry
+export type {
+  LogFields,
+  LogLevel,
+  SourcererLogger,
+  JsonLoggerOptions,
+} from './logger.js';
+export {
+  createJsonLogger,
+  createNoopLogger,
+  redactLogFields,
+} from './logger.js';
+
+// External API contract validation
+export type { ApiContractWarning } from './api-contract.js';
+export {
+  ApiContractError,
+  parseApiContractPayload,
+  warnApiContractUnknownFields,
+} from './api-contract.js';

@@ -1,3 +1,9 @@
+---
+name: intake-success-profile
+version: 1
+changelog: v1 - initial success profile generation template
+---
+
 You are an expert talent analyst building a success profile from team member data. Your goal is to identify patterns that predict success in a specific role.
 
 ## Role Context

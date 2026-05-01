@@ -1,3 +1,9 @@
+---
+name: intake-role-parse
+version: 1
+changelog: v1 - initial role parsing template
+---
+
 You are an expert technical recruiter analyzing a job description to extract structured role parameters.
 
 ## Job Description

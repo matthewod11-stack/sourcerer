@@ -4,6 +4,7 @@ import type { RawCandidate, Candidate, ScoredCandidate } from './candidate.js';
 import type { SearchConfig, OutputConfig, CostEstimate } from './pipeline.js';
 import type { TalentProfile } from './intake.js';
 import type { ResolveResult } from './identity-resolver.js';
+import type { SourcererLogger } from './logger.js';
 
 // --- Phase Definitions ---
 
@@ -92,7 +93,10 @@ export interface PhaseOutputMap {
 // --- Phase Handlers ---
 
 export interface PhaseHandler<TInput, TOutput> {
-  execute(input: TInput, context: PipelineContext): Promise<PhaseResult<TOutput>>;
+  execute(
+    input: TInput,
+    context: PipelineContext,
+  ): Promise<PhaseResult<TOutput>>;
 }
 
 export interface PipelineHandlers {
@@ -137,6 +141,7 @@ export interface PipelineContext {
    * Sourced from `config.retention.ttlDays` (default 90). H-2.
    */
   retentionTtlDays?: number;
+  logger?: SourcererLogger;
   onProgress?: (event: ProgressEvent) => void;
 }
 
@@ -153,6 +158,8 @@ export interface PipelineRunConfig {
   maxCostUsd?: number;
   /** PII retention window in days. Forwarded to adapters via PipelineContext. H-2. */
   retentionTtlDays?: number;
+  /** Structured run telemetry logger. E-2. */
+  logger?: SourcererLogger;
   onProgress?: (event: ProgressEvent) => void;
 }
 
@@ -170,7 +177,12 @@ export interface PhaseTimingEntry {
   error?: string;
 }
 
-export type RunStatus = 'running' | 'completed' | 'failed' | 'partial' | 'interrupted';
+export type RunStatus =
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'partial'
+  | 'interrupted';
 
 export interface RunMeta {
   runId: string;

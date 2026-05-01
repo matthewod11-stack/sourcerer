@@ -1,3 +1,9 @@
+---
+name: intake-config-generate
+version: 1
+changelog: v1 - initial search configuration generation template
+---
+
 You are an expert sourcing strategist generating a search configuration from a talent profile.
 
 ## Talent Profile

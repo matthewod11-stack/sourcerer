@@ -8,6 +8,7 @@ import type {
   Score,
   TokenUsage,
 } from '@sourcerer/core';
+import type { PromptMetadata } from '@sourcerer/ai';
 import { renderTemplate } from '@sourcerer/ai';
 import { formatEvidence, formatTalentProfile } from './signal-extractor.js';
 
@@ -19,6 +20,7 @@ export interface NarrativeOptions {
 export interface NarrativeResult {
   narrative: string;
   usage: TokenUsage;
+  prompt: PromptMetadata;
 }
 
 /**
@@ -32,8 +34,12 @@ export function formatScoreBreakdown(score: Score): string {
     // H-9: surface hallucination penalty so the narrative can reference it
     // and the model is aware which dimensions had fabricated citations.
     if (comp.hallucinationPenalty) {
-      const { hallucinatedCount, totalCitedCount, penaltyApplied, rawScoreBeforePenalty } =
-        comp.hallucinationPenalty;
+      const {
+        hallucinatedCount,
+        totalCitedCount,
+        penaltyApplied,
+        rawScoreBeforePenalty,
+      } = comp.hallucinationPenalty;
       const pct = Math.round(penaltyApplied * 100);
       line += ` [${hallucinatedCount}/${totalCitedCount} citations hallucinated → -${pct}% from ${rawScoreBeforePenalty}]`;
     }
@@ -81,12 +87,12 @@ export async function generateNarrative(
   const prompt = await renderTemplate('scoring-narrative', templateVars);
 
   const { content: narrative, usage } = await provider.chat(
-    [{ role: 'user', content: prompt }],
+    [{ role: 'user', content: prompt.content }],
     {
       temperature: options?.temperature ?? 0.3,
       model: options?.model,
     },
   );
 
-  return { narrative, usage };
+  return { narrative, usage, prompt: prompt.metadata };
 }

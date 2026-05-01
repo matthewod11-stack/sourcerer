@@ -50,6 +50,8 @@ export interface Score {
   breakdown: ScoreComponent[];
   weights: Record<string, number>;
   redFlags: RedFlag[];
+  /** Prompt template versions that contributed to this score or narrative. E-4. */
+  promptVersions?: Record<string, number>;
 }
 
 /** LLM-extracted signals per scoring dimension, grounded in evidence */
@@ -60,4 +62,6 @@ export interface ExtractedSignals {
   cultureFit: SignalDimension;
   reachability: SignalDimension;
   redFlags: RedFlag[];
+  /** Prompt template versions that contributed to signal extraction. E-4. */
+  promptVersions?: Record<string, number>;
 }

@@ -10,6 +10,7 @@ import type {
   EnrichmentResult,
   BatchResult,
   CostEstimate,
+  CostEstimateInput,
 } from '@sourcerer/core';
 import { XClient, XApiError, type XTier } from './x-client.js';
 import { buildProfileEvidence, buildTweetEvidence } from './parsers.js';
@@ -23,7 +24,11 @@ export class XAdapter implements DataSource {
   private delayMs: number;
   private tier: XTier;
 
-  constructor(apiKey: string, tier: XTier = 'basic', rateLimits?: Partial<RateLimitConfig>) {
+  constructor(
+    apiKey: string,
+    tier: XTier = 'basic',
+    rateLimits?: Partial<RateLimitConfig>,
+  ) {
     this.tier = tier;
     this.client = new XClient(apiKey, tier);
     this.rateLimits = {
@@ -31,11 +36,15 @@ export class XAdapter implements DataSource {
       maxConcurrent: tier === 'basic' ? 1 : 3,
       ...rateLimits,
     };
-    this.delayMs = 60_000 / (this.rateLimits.requestsPerMinute ?? this.client.requestsPerMinute);
+    this.delayMs =
+      60_000 /
+      (this.rateLimits.requestsPerMinute ?? this.client.requestsPerMinute);
   }
 
   async *search(_config: SearchConfig): AsyncGenerator<SearchPage> {
-    throw new Error('XAdapter is enrichment-only. Use enrich() or enrichBatch() instead.');
+    throw new Error(
+      'XAdapter is enrichment-only. Use enrich() or enrichBatch() instead.',
+    );
   }
 
   async enrich(candidate: Candidate): Promise<EnrichmentResult> {
@@ -57,7 +66,11 @@ export class XAdapter implements DataSource {
       if (!user.protected) {
         try {
           const tweets = await this.client.fetchRecentTweets(user.id, 50);
-          tweetEvidence = buildTweetEvidence(tweets, profileUrl, user.public_metrics.followers_count);
+          tweetEvidence = buildTweetEvidence(
+            tweets,
+            profileUrl,
+            user.public_metrics.followers_count,
+          );
         } catch {
           // Tweet fetch may fail (e.g., rate limit on second call); still return profile evidence
         }
@@ -96,11 +109,15 @@ export class XAdapter implements DataSource {
     }
   }
 
-  async enrichBatch(candidates: Candidate[]): Promise<BatchResult<EnrichmentResult>> {
+  async enrichBatch(
+    candidates: Candidate[],
+  ): Promise<BatchResult<EnrichmentResult>> {
     const succeeded: { candidateId: string; result: EnrichmentResult }[] = [];
-    const failed: { candidateId: string; error: Error; retryable: boolean }[] = [];
+    const failed: { candidateId: string; error: Error; retryable: boolean }[] =
+      [];
 
-    const maxConcurrent = this.tier === 'basic' ? 1 : (this.rateLimits.maxConcurrent ?? 3);
+    const maxConcurrent =
+      this.tier === 'basic' ? 1 : (this.rateLimits.maxConcurrent ?? 3);
     let rateLimitHit = false;
 
     if (maxConcurrent <= 1) {
@@ -151,7 +168,9 @@ export class XAdapter implements DataSource {
               for (const remaining of queue) {
                 failed.push({
                   candidateId: remaining.id,
-                  error: new Error('Skipped: rate limit hit on earlier request'),
+                  error: new Error(
+                    'Skipped: rate limit hit on earlier request',
+                  ),
                   retryable: true,
                 });
               }
@@ -186,7 +205,7 @@ export class XAdapter implements DataSource {
     }
   }
 
-  estimateCost(config: SearchConfig): CostEstimate {
+  estimateCost(config: CostEstimateInput): CostEstimate {
     // X API pricing is tier-based subscription, not per-request
     // Rough estimate: Basic ~$100/mo, Pro ~$5000/mo, Enterprise custom
     const candidateCount = config.maxCandidates ?? 50;

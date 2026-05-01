@@ -1,5 +1,8 @@
 // Hunter.io REST API client — bare fetch wrapper with quota tracking
 
+import { parseApiContractPayload, warnApiContractUnknownFields } from '@sourcerer/core';
+import { z } from 'zod';
+
 const HUNTER_API = 'https://api.hunter.io/v2';
 
 // --- Response Types ---
@@ -52,6 +55,73 @@ export interface HunterAccountInfo {
   };
 }
 
+const HunterSourceSchema = z
+  .object({
+    domain: z.string(),
+    uri: z.string(),
+    extracted_on: z.string(),
+  })
+  .passthrough();
+
+const HunterEmailResultSchema = z
+  .object({
+    email: z.string(),
+    score: z.number(),
+    domain: z.string(),
+    position: z.string().optional(),
+    first_name: z.string(),
+    last_name: z.string(),
+    type: z.enum(['personal', 'generic']),
+    confidence: z.number(),
+    sources: z.array(HunterSourceSchema).default([]),
+  })
+  .passthrough();
+
+const HunterVerificationSchema = z
+  .object({
+    email: z.string(),
+    result: z.enum(['deliverable', 'undeliverable', 'risky', 'unknown']),
+    score: z.number(),
+    smtp_server: z.string().optional(),
+    smtp_check: z.boolean().optional(),
+  })
+  .passthrough();
+
+const HunterDomainSearchResultSchema = z
+  .object({
+    domain: z.string(),
+    disposable: z.boolean().default(false),
+    webmail: z.boolean().default(false),
+    accept_all: z.boolean().default(false),
+    pattern: z.string().nullable().default(null),
+    organization: z.string().nullable().default(null),
+    emails: z.array(HunterEmailResultSchema).default([]),
+  })
+  .passthrough();
+
+const HunterAccountInfoSchema = z
+  .object({
+    email: z.string(),
+    plan_name: z.string(),
+    plan_level: z.number(),
+    requests: z
+      .object({
+        searches: z
+          .object({
+            used: z.number(),
+            available: z.number(),
+          })
+          .passthrough(),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+
+const HunterEmailFinderResponseSchema = z.object({ data: HunterEmailResultSchema }).passthrough();
+const HunterVerificationResponseSchema = z.object({ data: HunterVerificationSchema }).passthrough();
+const HunterDomainSearchResponseSchema = z.object({ data: HunterDomainSearchResultSchema }).passthrough();
+const HunterAccountResponseSchema = z.object({ data: HunterAccountInfoSchema }).passthrough();
+
 // --- Error ---
 
 export class HunterApiError extends Error {
@@ -79,11 +149,7 @@ export class HunterClient {
    * Find email address for a person at a given domain.
    * GET /email-finder?domain=...&first_name=...&last_name=...&api_key=...
    */
-  async findEmail(
-    domain: string,
-    firstName: string,
-    lastName: string,
-  ): Promise<HunterEmailResult | null> {
+  async findEmail(domain: string, firstName: string, lastName: string): Promise<HunterEmailResult | null> {
     const params = new URLSearchParams({
       domain,
       first_name: firstName,
@@ -91,7 +157,7 @@ export class HunterClient {
       api_key: this.apiKey,
     });
 
-    const result = await this.get<{ data: HunterEmailResult }>(`/email-finder?${params}`);
+    const result = await this.get(`/email-finder?${params}`, HunterEmailFinderResponseSchema);
     this.decrementQuota();
 
     // Hunter returns the data object even when no email found, but email will be empty
@@ -111,7 +177,7 @@ export class HunterClient {
       api_key: this.apiKey,
     });
 
-    const result = await this.get<{ data: HunterVerification }>(`/email-verifier?${params}`);
+    const result = await this.get(`/email-verifier?${params}`, HunterVerificationResponseSchema);
     return result.data;
   }
 
@@ -125,7 +191,7 @@ export class HunterClient {
       api_key: this.apiKey,
     });
 
-    const result = await this.get<{ data: HunterDomainSearchResult }>(`/domain-search?${params}`);
+    const result = await this.get(`/domain-search?${params}`, HunterDomainSearchResponseSchema);
     this.decrementQuota();
     return result.data;
   }
@@ -139,11 +205,10 @@ export class HunterClient {
       api_key: this.apiKey,
     });
 
-    const result = await this.get<{ data: HunterAccountInfo }>(`/account?${params}`);
+    const result = await this.get(`/account?${params}`, HunterAccountResponseSchema);
 
     // Update remaining searches from the authoritative source
-    this.remainingSearches =
-      result.data.requests.searches.available - result.data.requests.searches.used;
+    this.remainingSearches = result.data.requests.searches.available - result.data.requests.searches.used;
 
     return result.data;
   }
@@ -170,7 +235,7 @@ export class HunterClient {
     }
   }
 
-  private async get<T>(path: string): Promise<T> {
+  private async get<T>(path: string, schema: z.ZodType<T, z.ZodTypeDef, unknown>): Promise<T> {
     const response = await fetch(`${HUNTER_API}${path}`);
 
     if (!response.ok) {
@@ -179,7 +244,9 @@ export class HunterClient {
       let errorCode: string | undefined;
 
       try {
-        const body = (await response.json()) as { errors?: { details?: string; code?: string }[] };
+        const body = (await response.json()) as {
+          errors?: { details?: string; code?: string }[];
+        };
         if (body.errors?.[0]) {
           errorMessage = body.errors[0].details ?? errorMessage;
           errorCode = body.errors[0].code;
@@ -197,6 +264,11 @@ export class HunterClient {
       throw new HunterApiError(status, errorMessage, errorCode);
     }
 
-    return (await response.json()) as T;
+    const payload = await response.json();
+    return parseApiContractPayload(payload, schema, {
+      adapter: 'hunter',
+      endpoint: path.split('?')[0],
+      warn: warnApiContractUnknownFields,
+    });
   }
 }

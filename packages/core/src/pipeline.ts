@@ -28,6 +28,12 @@ export interface CostEstimate {
   currency: 'USD';
 }
 
+export interface EnrichmentCostInput {
+  maxCandidates: number;
+}
+
+export type CostEstimateInput = SearchConfig | EnrichmentCostInput;
+
 // --- Search & Discovery ---
 
 export interface SearchPage {
@@ -53,7 +59,7 @@ export interface DataSource {
   enrich(candidate: Candidate): Promise<EnrichmentResult>;
   enrichBatch(candidates: Candidate[]): Promise<BatchResult<EnrichmentResult>>;
   healthCheck(): Promise<boolean>;
-  estimateCost(config: SearchConfig): CostEstimate;
+  estimateCost(config: CostEstimateInput): CostEstimate;
 }
 
 // --- Search Config (bridge between intake and discovery) ---
@@ -135,8 +141,14 @@ export interface UpsertResult {
 export interface OutputAdapter {
   name: string;
   requiresAuth: boolean;
-  push(candidates: ScoredCandidate[], config: OutputConfig): Promise<PushResult>;
-  upsert(candidates: ScoredCandidate[], config: OutputConfig): Promise<UpsertResult>;
+  push(
+    candidates: ScoredCandidate[],
+    config: OutputConfig,
+  ): Promise<PushResult>;
+  upsert(
+    candidates: ScoredCandidate[],
+    config: OutputConfig,
+  ): Promise<UpsertResult>;
   testConnection(): Promise<boolean>;
 }
 

@@ -43,16 +43,16 @@ sourcerer/
 
 ## Documentation Map
 
-| Question | File |
-|---|---|
-| What's the next task? | [`ROADMAP.md`](ROADMAP.md) — first unchecked item |
-| How do I implement hardening item X? | [`docs/hardening-roadmap-2026-04-16.md`](docs/hardening-roadmap-2026-04-16.md) §X |
-| What's the product V1 plan? | [`docs/roadmap.md`](docs/roadmap.md) |
-| What's the design? | [`docs/specs/2026-03-20-sourcerer-design.md`](docs/specs/2026-03-20-sourcerer-design.md) |
-| What happened last session? | [`PROGRESS.md`](PROGRESS.md) |
-| What's being tracked for the overnight agent? | `gh issue list --label tech-debt` |
-| How does the overnight agent work? | [`docs/OVERNIGHT_AGENT.md`](docs/OVERNIGHT_AGENT.md) |
-| Setting up a new machine? | [`Machine Setup`](#machine-setup) section below |
+| Question                                      | File                                                                                     |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| What's the next task?                         | [`ROADMAP.md`](ROADMAP.md) — first unchecked item                                        |
+| How do I implement hardening item X?          | [`docs/hardening-roadmap-2026-04-16.md`](docs/hardening-roadmap-2026-04-16.md) §X        |
+| What's the product V1 plan?                   | [`docs/roadmap.md`](docs/roadmap.md)                                                     |
+| What's the design?                            | [`docs/specs/2026-03-20-sourcerer-design.md`](docs/specs/2026-03-20-sourcerer-design.md) |
+| What happened last session?                   | [`PROGRESS.md`](PROGRESS.md)                                                             |
+| What's being tracked for the overnight agent? | `gh issue list --label tech-debt`                                                        |
+| How does the overnight agent work?            | [`docs/OVERNIGHT_AGENT.md`](docs/OVERNIGHT_AGENT.md)                                     |
+| Setting up a new machine?                     | [`Machine Setup`](#machine-setup) section below                                          |
 
 ## Key Commands
 
@@ -71,18 +71,19 @@ pnpm clean            # Remove all dist/ and tsbuildinfo
 Most of what you need lands with `git clone` + `pnpm install`. A few things are intentionally per-machine and need to be provisioned manually — keys live outside the repo by design, and per-machine state would only confuse a sync.
 
 ### What `git clone` gives you
+
 All source, tests, prompts, docs, the overnight agent prompt, and the hardening roadmap. After `pnpm install && pnpm build && pnpm test` you have a working, tested codebase.
 
 ### What's per-machine (gitignored)
 
-| Path | Purpose | Provisioning |
-|---|---|---|
-| `~/.sourcerer/config.yaml` | API keys (Anthropic, Exa, GitHub, Hunter, Notion) | **Copy from another machine** (`scp`/`rsync`), or run `pnpm --filter @sourcerer/cli start init` and paste keys interactively |
-| `.env` / `.env.local` | Optional shell-env overrides for development | Copy if you have a working setup; otherwise unneeded |
-| `runs/` (repo root) | Cached candidate data from past sourcing runs (contains PII) | **Don't sync.** Recreate per machine — running another sourcing pass is cheaper than transferring PII across machines |
-| `state/` (repo root) | Overnight-agent run log + other runtime state | Auto-created on first overnight-agent run; don't sync |
-| `PROGRESS.md` | Per-machine session history written by `/session-start` and `/session-end` | **Don't sync.** Each machine keeps its own — divergent histories will confuse you |
-| `AGENTS.md`, `PROJECT_STATE.md`, `prompts/`, `DESIGN-sourcerer-strategy-*.md`, `PROGRESS_ARCHIVE.md` | Personal/workflow files kept out of the public OSS repo | Copy if you have them on another machine; otherwise the project still runs without them |
+| Path                                                                                                 | Purpose                                                                    | Provisioning                                                                                                                 |
+| ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `~/.sourcerer/config.yaml`                                                                           | API keys (Anthropic, Exa, GitHub, Hunter, Notion)                          | **Copy from another machine** (`scp`/`rsync`), or run `pnpm --filter @sourcerer/cli start init` and paste keys interactively |
+| `.env` / `.env.local`                                                                                | Optional shell-env overrides for development                               | Copy if you have a working setup; otherwise unneeded                                                                         |
+| `runs/` (repo root)                                                                                  | Cached candidate data from past sourcing runs (contains PII)               | **Don't sync.** Recreate per machine — running another sourcing pass is cheaper than transferring PII across machines        |
+| `state/` (repo root)                                                                                 | Overnight-agent run log + other runtime state                              | Auto-created on first overnight-agent run; don't sync                                                                        |
+| `PROGRESS.md`                                                                                        | Per-machine session history written by `/session-start` and `/session-end` | **Don't sync.** Each machine keeps its own — divergent histories will confuse you                                            |
+| `AGENTS.md`, `PROJECT_STATE.md`, `prompts/`, `DESIGN-sourcerer-strategy-*.md`, `PROGRESS_ARCHIVE.md` | Personal/workflow files kept out of the public OSS repo                    | Copy if you have them on another machine; otherwise the project still runs without them                                      |
 
 ### Fastest provisioning path on a new machine
 
@@ -101,7 +102,18 @@ node apps/cli/scripts/h1-adversarial-eval.mjs
 ```
 
 ### Public repo hygiene
+
 This repo is open source. The gitignore is curated to keep secrets, PII, internal planning, and personal workflow scaffolding out of public history. **Before adding a new file at the repo root, check whether it should be added to `.gitignore` first** — the cost of leaking once is much higher than the cost of an extra `gitignore` line.
+
+### Data at rest
+
+Sourcerer is currently a local, single-user tool. Run artifacts live under `runs/<date-role>/` by default and include plaintext `candidates.json`, `checkpoint.json`, `run-meta.json`, and optional report/output files. These paths are gitignored, but not encrypted.
+
+Run artifacts may contain PII fields from adapters (email, phone, address if present), source URLs, adapter provenance, collection timestamps, and `retentionExpiresAt` values. API keys do not belong in run artifacts; keys live in `~/.sourcerer/config.yaml` or environment variables.
+
+Default PII retention is 90 days unless changed in config. Use `sourcerer candidates purge --expired` to redact expired local PII. Local purge does not affect remote copies already pushed to Notion or other output tools.
+
+At-rest encryption is an explicit non-goal for the current local-dev posture. Do not run Sourcerer on shared machines, synced shared folders, or multi-user servers without external disk encryption and access controls.
 
 ## Key Files
 

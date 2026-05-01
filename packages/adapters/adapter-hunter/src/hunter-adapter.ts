@@ -10,6 +10,7 @@ import type {
   EnrichmentResult,
   BatchResult,
   CostEstimate,
+  CostEstimateInput,
 } from '@sourcerer/core';
 import { HunterClient, HunterApiError } from './hunter-client.js';
 import {
@@ -46,7 +47,9 @@ export class HunterAdapter implements DataSource {
   }
 
   async *search(_config: SearchConfig): AsyncGenerator<SearchPage> {
-    throw new Error('HunterAdapter is enrichment-only. Use enrich() or enrichBatch() instead.');
+    throw new Error(
+      'HunterAdapter is enrichment-only. Use enrich() or enrichBatch() instead.',
+    );
   }
 
   async enrich(candidate: Candidate): Promise<EnrichmentResult> {
@@ -66,7 +69,11 @@ export class HunterAdapter implements DataSource {
 
     try {
       // Find email via Hunter
-      const emailResult = await this.client.findEmail(domain, firstName, lastName);
+      const emailResult = await this.client.findEmail(
+        domain,
+        firstName,
+        lastName,
+      );
       if (!emailResult) {
         return this.emptyResult(candidate.id, now);
       }
@@ -78,7 +85,10 @@ export class HunterAdapter implements DataSource {
       // Verify the found email
       try {
         const verification = await this.client.verifyEmail(emailResult.email);
-        const verifyEvidence = buildVerificationEvidence(verification, candidateUrl);
+        const verifyEvidence = buildVerificationEvidence(
+          verification,
+          candidateUrl,
+        );
         evidence = [...evidence, ...verifyEvidence];
       } catch {
         // Verification is best-effort — don't fail the whole enrichment
@@ -111,9 +121,12 @@ export class HunterAdapter implements DataSource {
     }
   }
 
-  async enrichBatch(candidates: Candidate[]): Promise<BatchResult<EnrichmentResult>> {
+  async enrichBatch(
+    candidates: Candidate[],
+  ): Promise<BatchResult<EnrichmentResult>> {
     const succeeded: { candidateId: string; result: EnrichmentResult }[] = [];
-    const failed: { candidateId: string; error: Error; retryable: boolean }[] = [];
+    const failed: { candidateId: string; error: Error; retryable: boolean }[] =
+      [];
     let apiCallCount = 0;
 
     // Pre-fetch account info to know quota if not already loaded
@@ -161,7 +174,8 @@ export class HunterAdapter implements DataSource {
         if (willCallApi) apiCallCount++;
       } catch (err) {
         const isRateLimit =
-          err instanceof HunterApiError && (err.status === 429 || err.status === 401);
+          err instanceof HunterApiError &&
+          (err.status === 429 || err.status === 401);
         failed.push({
           candidateId: candidate.id,
           error: err instanceof Error ? err : new Error(String(err)),
@@ -172,20 +186,25 @@ export class HunterAdapter implements DataSource {
     }
 
     // Only charge for candidates that actually hit the Hunter API
-    return { succeeded, failed, costIncurred: apiCallCount * this.costPerSearch };
+    return {
+      succeeded,
+      failed,
+      costIncurred: apiCallCount * this.costPerSearch,
+    };
   }
 
   async healthCheck(): Promise<boolean> {
     try {
       const info = await this.client.getAccountInfo();
-      const remaining = info.requests.searches.available - info.requests.searches.used;
+      const remaining =
+        info.requests.searches.available - info.requests.searches.used;
       return remaining > 0;
     } catch {
       return false;
     }
   }
 
-  estimateCost(config: SearchConfig): CostEstimate {
+  estimateCost(config: CostEstimateInput): CostEstimate {
     const enrichCount = config.maxCandidates ?? 0;
     return {
       estimatedCost: enrichCount * this.costPerSearch,
@@ -198,7 +217,10 @@ export class HunterAdapter implements DataSource {
 
   // --- Private ---
 
-  private extractName(candidate: Candidate): { firstName: string; lastName: string } {
+  private extractName(candidate: Candidate): {
+    firstName: string;
+    lastName: string;
+  } {
     const name = candidate.name?.trim();
     if (!name) {
       return { firstName: '', lastName: '' };
@@ -219,7 +241,10 @@ export class HunterAdapter implements DataSource {
       const company = sourceData.rawProfile?.company;
       if (typeof company === 'string' && company.includes('.')) {
         // Looks like a domain already
-        return company.toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+        return company
+          .toLowerCase()
+          .replace(/^https?:\/\//, '')
+          .replace(/\/.*$/, '');
       }
     }
 
@@ -227,7 +252,10 @@ export class HunterAdapter implements DataSource {
     for (const enrichment of Object.values(candidate.enrichments)) {
       const company = enrichment.sourceData.rawProfile?.company;
       if (typeof company === 'string' && company.includes('.')) {
-        return company.toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+        return company
+          .toLowerCase()
+          .replace(/^https?:\/\//, '')
+          .replace(/\/.*$/, '');
       }
     }
 

@@ -3,12 +3,13 @@
 import chalk from 'chalk';
 import { rm } from 'node:fs/promises';
 import { confirm } from '@inquirer/prompts';
-import { listAllRuns } from '../run-loader.js';
+import { listAllRuns, loadCandidates } from '../run-loader.js';
 import type { RunSummary } from '../run-loader.js';
-import type { RunStatus } from '@sourcerer/core';
+import type { RunStatus, ScoredCandidate } from '@sourcerer/core';
 
 interface ParsedRunsArgs {
-  subcommand: 'list' | 'clean';
+  subcommand: 'list' | 'clean' | 'show';
+  runId?: string;
   olderThan?: string;
   yes: boolean;
   json: boolean;
@@ -17,7 +18,8 @@ interface ParsedRunsArgs {
 }
 
 function parseArgs(args: string[]): ParsedRunsArgs {
-  let subcommand: 'list' | 'clean' = 'list';
+  let subcommand: 'list' | 'clean' | 'show' = 'list';
+  let runId: string | undefined;
   let olderThan: string | undefined;
   let yes = false;
   let json = false;
@@ -36,13 +38,15 @@ function parseArgs(args: string[]): ParsedRunsArgs {
     } else if (args[i] === '--runs-dir' && args[i + 1]) {
       runsDir = args[++i];
     } else if (!args[i].startsWith('--')) {
-      if (args[i] === 'list' || args[i] === 'clean') {
-        subcommand = args[i] as 'list' | 'clean';
+      if (args[i] === 'list' || args[i] === 'clean' || args[i] === 'show') {
+        subcommand = args[i] as 'list' | 'clean' | 'show';
+      } else if (subcommand === 'show' && !runId) {
+        runId = args[i];
       }
     }
   }
 
-  return { subcommand, olderThan, yes, json, help, runsDir };
+  return { subcommand, runId, olderThan, yes, json, help, runsDir };
 }
 
 function printUsage(): void {
@@ -50,6 +54,9 @@ function printUsage(): void {
   console.log('');
   console.log('Subcommands:');
   console.log('  list                  List all runs (default)');
+  console.log(
+    '  show <id>             Show details for a run id or directory name',
+  );
   console.log('  clean                 Delete old runs');
   console.log('');
   console.log('Options:');
@@ -135,6 +142,42 @@ function renderRunsTable(runs: RunSummary[]): void {
   }
 }
 
+function formatPromptVersions(candidates: ScoredCandidate[]): string {
+  const versions: Record<string, number> = {};
+  for (const candidate of candidates) {
+    Object.assign(versions, candidate.signals.promptVersions);
+    Object.assign(versions, candidate.score.promptVersions);
+  }
+
+  const entries = Object.entries(versions).sort(([a], [b]) =>
+    a.localeCompare(b),
+  );
+  if (entries.length === 0) return 'none recorded';
+  return entries.map(([name, version]) => `${name} v${version}`).join(', ');
+}
+
+async function showRun(run: RunSummary): Promise<void> {
+  let promptVersions = 'none recorded';
+  try {
+    const candidates = await loadCandidates(run.runDir);
+    promptVersions = formatPromptVersions(candidates);
+  } catch {
+    // Older or interrupted runs may not have candidates.json yet.
+  }
+
+  console.log('');
+  console.log(chalk.bold('  Sourcerer Run'));
+  console.log(`  Run ID: ${run.meta.runId}`);
+  console.log(`  Directory: ${run.dirName}`);
+  console.log(`  Role: ${run.meta.roleName}`);
+  console.log(`  Status: ${run.meta.status}`);
+  console.log(`  Candidates: ${run.meta.candidateCount ?? 0}`);
+  console.log(`  Cost: ${formatCost(run.meta.cost.totalCost)}`);
+  console.log(`  Duration: ${formatDuration(run.meta.totalDurationMs)}`);
+  console.log(`  Prompts used: ${promptVersions}`);
+  console.log(`  Run dir: ${run.runDir}`);
+}
+
 export async function runsCommand(args: string[]): Promise<void> {
   const parsed = parseArgs(args);
 
@@ -144,6 +187,24 @@ export async function runsCommand(args: string[]): Promise<void> {
   }
 
   const runs = await listAllRuns(parsed.runsDir);
+
+  if (parsed.subcommand === 'show') {
+    if (!parsed.runId) {
+      console.error(chalk.red('Usage: sourcerer runs show <id>'));
+      process.exitCode = 1;
+      return;
+    }
+    const run = runs.find(
+      (r) => r.meta.runId === parsed.runId || r.dirName === parsed.runId,
+    );
+    if (!run) {
+      console.error(chalk.red(`Run not found: ${parsed.runId}`));
+      process.exitCode = 1;
+      return;
+    }
+    await showRun(run);
+    return;
+  }
 
   if (parsed.subcommand === 'list') {
     if (runs.length === 0) {
@@ -163,7 +224,11 @@ export async function runsCommand(args: string[]): Promise<void> {
 
   if (parsed.subcommand === 'clean') {
     if (!parsed.olderThan) {
-      console.error(chalk.red('--older-than is required for clean. Example: sourcerer runs clean --older-than 30d'));
+      console.error(
+        chalk.red(
+          '--older-than is required for clean. Example: sourcerer runs clean --older-than 30d',
+        ),
+      );
       process.exitCode = 1;
       return;
     }
@@ -187,9 +252,13 @@ export async function runsCommand(args: string[]): Promise<void> {
       return;
     }
 
-    console.log(`Found ${toDelete.length} run${toDelete.length !== 1 ? 's' : ''} to delete:`);
+    console.log(
+      `Found ${toDelete.length} run${toDelete.length !== 1 ? 's' : ''} to delete:`,
+    );
     for (const run of toDelete) {
-      console.log(`  ${formatDate(run.meta.startedAt)}  ${run.meta.roleName}  (${run.dirName})`);
+      console.log(
+        `  ${formatDate(run.meta.startedAt)}  ${run.meta.roleName}  (${run.dirName})`,
+      );
     }
 
     if (!parsed.yes) {
@@ -204,6 +273,8 @@ export async function runsCommand(args: string[]): Promise<void> {
       await rm(run.runDir, { recursive: true, force: true });
     }
 
-    console.log(`Deleted ${toDelete.length} run${toDelete.length !== 1 ? 's' : ''}.`);
+    console.log(
+      `Deleted ${toDelete.length} run${toDelete.length !== 1 ? 's' : ''}.`,
+    );
   }
 }

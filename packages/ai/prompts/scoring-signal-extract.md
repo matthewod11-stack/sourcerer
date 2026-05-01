@@ -1,3 +1,9 @@
+---
+name: scoring-signal-extract
+version: 2
+changelog: v2 - added injection sandboxing constraint (2026-04-16)
+---
+
 You are an expert talent evaluator extracting scoring signals from candidate evidence.
 
 ## CRITICAL DATA-HANDLING CONSTRAINT

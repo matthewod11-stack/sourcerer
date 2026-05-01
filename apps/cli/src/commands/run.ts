@@ -5,6 +5,7 @@ import yaml from 'js-yaml';
 import chalk from 'chalk';
 import {
   PipelineRunner,
+  createJsonLogger,
   createDedupHandler,
   loadCheckpoint,
   getAdapterApiKey,
@@ -36,6 +37,7 @@ export interface ParsedRunArgs {
   yes: boolean;
   noInteractive: boolean;
   quiet: boolean;
+  jsonLogs: boolean;
 }
 
 export function parseArgs(args: string[]): ParsedRunArgs {
@@ -46,6 +48,7 @@ export function parseArgs(args: string[]): ParsedRunArgs {
   let yes = false;
   let noInteractive = false;
   let quiet = false;
+  let jsonLogs = false;
   const outputFormats: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -65,27 +68,56 @@ export function parseArgs(args: string[]): ParsedRunArgs {
       noInteractive = true;
     } else if (args[i] === '--quiet' || args[i] === '-q') {
       quiet = true;
+    } else if (args[i] === '--json-logs') {
+      jsonLogs = true;
     } else if (args[i] === '--help' || args[i] === '-h') {
       printUsage();
-      return { outputFormats: [], useIntake: false, noCache: false, yes: false, noInteractive: false, quiet: false };
+      return {
+        outputFormats: [],
+        useIntake: false,
+        noCache: false,
+        yes: false,
+        noInteractive: false,
+        quiet: false,
+        jsonLogs: false,
+      };
     }
   }
 
-  return { configPath, outputFormats, resumeFrom, useIntake, noCache, yes, noInteractive, quiet };
+  return {
+    configPath,
+    outputFormats,
+    resumeFrom,
+    useIntake,
+    noCache,
+    yes,
+    noInteractive,
+    quiet,
+    jsonLogs,
+  };
 }
 
 function printUsage(): void {
-  console.log('Usage: sourcerer run --config <path> [--output json,markdown] [--resume <dir>]');
+  console.log(
+    'Usage: sourcerer run --config <path> [--output json,markdown] [--resume <dir>]',
+  );
   console.log('');
   console.log('Options:');
-  console.log('  --config <path>     Path to search config YAML file (required)');
-  console.log('  --output <formats>  Output formats, comma-separated (default: json)');
+  console.log(
+    '  --config <path>     Path to search config YAML file (required)',
+  );
+  console.log(
+    '  --output <formats>  Output formats, comma-separated (default: json)',
+  );
   console.log('  --resume <dir>      Resume from a previous run directory');
   console.log('  --intake            Run interactive intake before pipeline');
   console.log('  --no-cache          Disable AI response caching');
   console.log('  --yes, -y           Skip budget confirmation prompt');
   console.log('  --no-interactive    Non-interactive mode (implies --yes)');
   console.log('  --quiet, -q         Suppress progress output');
+  console.log(
+    '  --json-logs         Emit structured run telemetry as JSON lines to stderr',
+  );
 }
 
 export async function runCommand(args: string[]): Promise<void> {
@@ -95,13 +127,17 @@ export async function runCommand(args: string[]): Promise<void> {
   if (parsed.noInteractive) parsed.yes = true;
 
   if (parsed.noInteractive && parsed.useIntake && !parsed.configPath) {
-    console.error(chalk.red('--no-interactive with --intake requires --config <path>'));
+    console.error(
+      chalk.red('--no-interactive with --intake requires --config <path>'),
+    );
     process.exitCode = 1;
     return;
   }
 
   if (parsed.noInteractive && !parsed.configPath && !parsed.resumeFrom) {
-    console.error(chalk.red('--no-interactive requires --config <path> or --resume <dir>'));
+    console.error(
+      chalk.red('--no-interactive requires --config <path> or --resume <dir>'),
+    );
     process.exitCode = 1;
     return;
   }
@@ -185,7 +221,11 @@ export async function runCommand(args: string[]): Promise<void> {
       talentProfile = checkpoint.phaseOutputs.intake.talentProfile;
     }
     if (!searchConfig) {
-      console.error(chalk.red('Resume requires --config <path> when no intake phase was run previously.'));
+      console.error(
+        chalk.red(
+          'Resume requires --config <path> when no intake phase was run previously.',
+        ),
+      );
       process.exitCode = 1;
       return;
     }
@@ -196,7 +236,11 @@ export async function runCommand(args: string[]): Promise<void> {
   const retentionTtlDays = sourcererConfig.retention.ttlDays;
 
   // Instantiate adapters
-  const exa = new ExaAdapter(sourcererConfig.adapters.exa.apiKey, undefined, retentionTtlDays);
+  const exa = new ExaAdapter(
+    sourcererConfig.adapters.exa.apiKey,
+    undefined,
+    retentionTtlDays,
+  );
 
   const githubToken = process.env.GITHUB_TOKEN;
   const github = new GitHubAdapter(githubToken, undefined, retentionTtlDays);
@@ -212,7 +256,8 @@ export async function runCommand(args: string[]): Promise<void> {
   // Budget estimation — pass the effective AI model so the estimate uses
   // per-model pricing (H-7) instead of a flat constant.
   const aiModel =
-    sourcererConfig.aiProvider.model ?? getDefaultModel(sourcererConfig.aiProvider.name);
+    sourcererConfig.aiProvider.model ??
+    getDefaultModel(sourcererConfig.aiProvider.name);
   const estimate = estimateBudget(
     { exa, github, x, hunter },
     searchConfig!,
@@ -244,21 +289,34 @@ export async function runCommand(args: string[]): Promise<void> {
   }
 
   // Create AI provider for scoring
-  const aiProvider = createAIProvider(sourcererConfig, { noCache: parsed.noCache });
+  const aiProvider = createAIProvider(sourcererConfig, {
+    noCache: parsed.noCache,
+  });
 
   // Build pipeline
   const runner = new PipelineRunner({
     discover: createDiscoverHandler(exa),
     dedup: createDedupHandler(),
-    enrich: createEnrichHandler({ exa, github, x, hunter }, {
-      enrichmentPriority: searchConfig?.enrichmentPriority,
-      maxCostUsd: searchConfig?.maxCostUsd,
-    }),
+    enrich: createEnrichHandler(
+      { exa, github, x, hunter },
+      {
+        enrichmentPriority: searchConfig?.enrichmentPriority,
+        maxCostUsd: searchConfig?.maxCostUsd,
+      },
+    ),
     score: createScoreHandler(searchConfig!, talentProfile!, aiProvider),
     output: createOutputHandler(outputAdapters),
   });
 
-  console.log(chalk.blue(`Starting pipeline: ${searchConfig?.roleName ?? 'resumed run'}`));
+  const logger = parsed.jsonLogs
+    ? createJsonLogger({
+        sink: (line) => process.stderr.write(`${line}\n`),
+      })
+    : undefined;
+
+  console.log(
+    chalk.blue(`Starting pipeline: ${searchConfig?.roleName ?? 'resumed run'}`),
+  );
 
   const meta = await runner.run({
     roleName: searchConfig?.roleName ?? 'unknown',
@@ -267,17 +325,21 @@ export async function runCommand(args: string[]): Promise<void> {
     resumeFrom: parsed.resumeFrom,
     maxCostUsd: searchConfig?.maxCostUsd,
     retentionTtlDays,
-    onProgress: parsed.quiet ? undefined : (event) => {
-      const icon =
-        event.status === 'completed'
-          ? chalk.green('done')
-          : event.status === 'running'
-            ? chalk.blue('...')
-            : event.status === 'skipped'
-              ? chalk.gray('skip')
-              : chalk.red('fail');
-      console.log(`  [${icon}] ${event.message}`);
-    },
+    logger,
+    onProgress:
+      parsed.quiet || parsed.jsonLogs
+        ? undefined
+        : (event) => {
+            const icon =
+              event.status === 'completed'
+                ? chalk.green('done')
+                : event.status === 'running'
+                  ? chalk.blue('...')
+                  : event.status === 'skipped'
+                    ? chalk.gray('skip')
+                    : chalk.red('fail');
+            console.log(`  [${icon}] ${event.message}`);
+          },
   });
 
   // Print summary
@@ -286,7 +348,9 @@ export async function runCommand(args: string[]): Promise<void> {
   console.log(`  Status: ${meta.status}`);
   console.log(`  Candidates: ${meta.candidateCount ?? 0}`);
   console.log(`  Cost: $${meta.cost.totalCost.toFixed(4)}`);
-  console.log(`  Estimated: $${estimate.total.toFixed(4)}, Actual: $${meta.cost.totalCost.toFixed(4)}`);
+  console.log(
+    `  Estimated: $${estimate.total.toFixed(4)}, Actual: $${meta.cost.totalCost.toFixed(4)}`,
+  );
   console.log(`  Duration: ${meta.totalDurationMs ?? 0}ms`);
   console.log(`  Run dir: ${meta.runDir}`);
 }

@@ -1,8 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { HunterAdapter } from '../hunter-adapter.js';
-import { buildPiiFields, buildEmailEvidence, buildVerificationEvidence } from '../parsers.js';
-import type { Candidate, ObservedIdentifier, SourceData } from '@sourcerer/core';
-import type { HunterEmailResult, HunterVerification, HunterAccountInfo } from '../hunter-client.js';
+import {
+  buildPiiFields,
+  buildEmailEvidence,
+  buildVerificationEvidence,
+} from '../parsers.js';
+import {
+  ApiContractError,
+  type Candidate,
+  type ObservedIdentifier,
+  type SourceData,
+} from '@sourcerer/core';
+import {
+  HunterClient,
+  type HunterEmailResult,
+  type HunterVerification,
+  type HunterAccountInfo,
+} from '../hunter-client.js';
 
 // --- Mock Data ---
 
@@ -16,9 +30,21 @@ const mockEmailResult: HunterEmailResult = {
   type: 'personal',
   confidence: 92,
   sources: [
-    { domain: 'blog.example.com', uri: 'https://blog.example.com/team', extracted_on: '2026-01-15' },
-    { domain: 'conference.io', uri: 'https://conference.io/speakers', extracted_on: '2025-11-20' },
-    { domain: 'github.com', uri: 'https://github.com/janesmith', extracted_on: '2025-09-01' },
+    {
+      domain: 'blog.example.com',
+      uri: 'https://blog.example.com/team',
+      extracted_on: '2026-01-15',
+    },
+    {
+      domain: 'conference.io',
+      uri: 'https://conference.io/speakers',
+      extracted_on: '2025-11-20',
+    },
+    {
+      domain: 'github.com',
+      uri: 'https://github.com/janesmith',
+      extracted_on: '2025-09-01',
+    },
   ],
 };
 
@@ -98,7 +124,9 @@ beforeEach(() => {
     if (endpoint === '/domain-search') {
       return {
         ok: true,
-        json: async () => ({ data: { domain: 'example.com', emails: [mockEmailResult] } }),
+        json: async () => ({
+          data: { domain: 'example.com', emails: [mockEmailResult] },
+        }),
       };
     }
     if (endpoint === '/account') {
@@ -108,7 +136,11 @@ beforeEach(() => {
       };
     }
 
-    return { ok: false, status: 404, json: async () => ({ errors: [{ details: 'Not found' }] }) };
+    return {
+      ok: false,
+      status: 404,
+      json: async () => ({ errors: [{ details: 'Not found' }] }),
+    };
   });
 
   vi.stubGlobal('fetch', mockFetch);
@@ -121,7 +153,11 @@ afterEach(() => {
 // --- Helpers ---
 
 function makeCandidate(
-  opts: { name?: string; company?: string; identifiers?: ObservedIdentifier[] } = {},
+  opts: {
+    name?: string;
+    company?: string;
+    identifiers?: ObservedIdentifier[];
+  } = {},
 ): Candidate {
   const sources: Record<string, SourceData> = {};
   if (opts.company) {
@@ -159,7 +195,10 @@ describe('HunterAdapter', () => {
 
   describe('enrich()', () => {
     it('returns email evidence and PII when name + domain available', async () => {
-      const candidate = makeCandidate({ name: 'Jane Smith', company: 'example.com' });
+      const candidate = makeCandidate({
+        name: 'Jane Smith',
+        company: 'example.com',
+      });
       const result = await adapter.enrich(candidate);
 
       expect(result.adapter).toBe('hunter');
@@ -207,7 +246,10 @@ describe('HunterAdapter', () => {
         return { ok: true, json: async () => ({}) };
       });
 
-      const candidate = makeCandidate({ name: 'Jane Smith', company: 'example.com' });
+      const candidate = makeCandidate({
+        name: 'Jane Smith',
+        company: 'example.com',
+      });
       const result = await adapter.enrich(candidate);
 
       expect(result.evidence).toHaveLength(0);
@@ -221,7 +263,10 @@ describe('HunterAdapter', () => {
           return { ok: true, json: async () => ({ data: mockEmailResult }) };
         }
         if (endpoint === '/email-verifier') {
-          return { ok: true, json: async () => ({ data: mockUndeliverableVerification }) };
+          return {
+            ok: true,
+            json: async () => ({ data: mockUndeliverableVerification }),
+          };
         }
         if (endpoint === '/account') {
           return { ok: true, json: async () => ({ data: mockAccountInfo }) };
@@ -229,16 +274,24 @@ describe('HunterAdapter', () => {
         return { ok: true, json: async () => ({}) };
       });
 
-      const candidate = makeCandidate({ name: 'Jane Smith', company: 'example.com' });
+      const candidate = makeCandidate({
+        name: 'Jane Smith',
+        company: 'example.com',
+      });
       const result = await adapter.enrich(candidate);
 
-      const verifyClaim = result.evidence.find((e) => e.claim.includes('undeliverable'));
+      const verifyClaim = result.evidence.find((e) =>
+        e.claim.includes('undeliverable'),
+      );
       expect(verifyClaim).toBeDefined();
       expect(verifyClaim!.claim).toContain('undeliverable');
     });
 
     it('evidence IDs all match ev-XXXXXX pattern', async () => {
-      const candidate = makeCandidate({ name: 'Jane Smith', company: 'example.com' });
+      const candidate = makeCandidate({
+        name: 'Jane Smith',
+        company: 'example.com',
+      });
       const result = await adapter.enrich(candidate);
 
       for (const ev of result.evidence) {
@@ -279,7 +332,10 @@ describe('HunterAdapter', () => {
       mockFetch.mockImplementation(async (url: string) => {
         const endpoint = extractEndpoint(url);
         if (endpoint === '/account') {
-          return { ok: true, json: async () => ({ data: mockExhaustedAccountInfo }) };
+          return {
+            ok: true,
+            json: async () => ({ data: mockExhaustedAccountInfo }),
+          };
         }
         if (endpoint === '/email-finder') {
           return { ok: true, json: async () => ({ data: mockEmailResult }) };
@@ -380,17 +436,7 @@ describe('HunterAdapter', () => {
 
   describe('estimateCost()', () => {
     it('returns per-candidate cost estimate', () => {
-      const estimate = adapter.estimateCost({
-        roleName: 'Backend Engineer',
-        tiers: [],
-        scoringWeights: {},
-        tierThresholds: { tier1MinScore: 70, tier2MinScore: 40 },
-        enrichmentPriority: [],
-        antiFilters: [],
-        maxCandidates: 20,
-        createdAt: '2026-03-25T00:00:00Z',
-        version: 1,
-      });
+      const estimate = adapter.estimateCost({ maxCandidates: 20 });
 
       expect(estimate.estimatedCost).toBeCloseTo(0.6); // 20 * 0.03
       expect(estimate.enrichCount).toBe(20);
@@ -403,6 +449,54 @@ describe('HunterAdapter', () => {
       const gen = adapter.search({} as never);
       await expect(gen.next()).rejects.toThrow('enrichment-only');
     });
+  });
+});
+
+describe('HunterClient API contract validation (H-11)', () => {
+  it('throws ApiContractError with the missing field path', async () => {
+    mockFetch.mockImplementation(async () => ({
+      ok: true,
+      json: async () => ({
+        data: {
+          ...mockEmailResult,
+          score: undefined,
+        },
+      }),
+    }));
+
+    const client = new HunterClient('test-api-key');
+    const error = await client
+      .findEmail('example.com', 'Jane', 'Smith')
+      .catch((err: unknown) => err);
+
+    expect(error).toBeInstanceOf(ApiContractError);
+    expect(error).toMatchObject({
+      adapter: 'hunter',
+      fieldPaths: ['data.score'],
+    });
+  });
+
+  it('warns on unknown fields without rejecting the response', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockFetch.mockImplementation(async () => ({
+      ok: true,
+      json: async () => ({
+        data: {
+          ...mockEmailResult,
+          new_confidence_reason: 'new-api-field',
+        },
+      }),
+    }));
+
+    const client = new HunterClient('test-api-key');
+    await expect(
+      client.findEmail('example.com', 'Jane', 'Smith'),
+    ).resolves.toMatchObject({
+      email: 'jane.smith@example.com',
+    });
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('data.new_confidence_reason'),
+    );
   });
 });
 
@@ -451,7 +545,10 @@ describe('Parsers', () => {
 
   describe('buildEmailEvidence()', () => {
     it('generates evidence with correct adapter and ev-XXXXXX IDs', () => {
-      const evidence = buildEmailEvidence(mockEmailResult, 'https://hunter.io/find/example.com');
+      const evidence = buildEmailEvidence(
+        mockEmailResult,
+        'https://hunter.io/find/example.com',
+      );
 
       expect(evidence.length).toBe(2); // email claim + sources claim
       for (const ev of evidence) {

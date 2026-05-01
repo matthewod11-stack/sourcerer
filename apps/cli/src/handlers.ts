@@ -39,7 +39,7 @@ export function createDiscoverHandler(
   exa: ExaAdapter,
 ): PhaseHandler<IntakePhaseOutput, DiscoverPhaseOutput> {
   return {
-    async execute(input) {
+    async execute(input, context) {
       const rawCandidates: RawCandidate[] = [];
       let costIncurred = 0;
 
@@ -47,6 +47,13 @@ export function createDiscoverHandler(
         rawCandidates.push(...page.candidates);
         costIncurred += page.costIncurred;
       }
+      context.logger?.info('adapter.call', {
+        phase: 'discover',
+        adapter: exa.name,
+        operation: 'search',
+        candidatesReturned: rawCandidates.length,
+        costIncurredUsd: costIncurred,
+      });
 
       return {
         status: 'completed',
@@ -79,10 +86,11 @@ export function createEnrichHandler(
   options?: EnrichOrchestratorOptions,
 ): PhaseHandler<DedupPhaseOutput, EnrichPhaseOutput> {
   return {
-    async execute(input) {
+    async execute(input, context) {
       const candidates = [...input.candidates];
       let costIncurred = 0;
-      const allFailures: { item: string; error: string; retryable: boolean }[] = [];
+      const allFailures: { item: string; error: string; retryable: boolean }[] =
+        [];
       const staleTtlMs = options?.staleTtlMs ?? DEFAULT_STALE_TTL_MS;
 
       // Build ordered adapter list from priority config or defaults
@@ -92,7 +100,11 @@ export function createEnrichHandler(
         ? priorityConfig.map((p) => p.adapter)
         : DEFAULT_ADAPTER_ORDER;
 
-      const activeAdapters: { name: string; adapter: DataSource; priority: EnrichmentPriority | undefined }[] = [];
+      const activeAdapters: {
+        name: string;
+        adapter: DataSource;
+        priority: EnrichmentPriority | undefined;
+      }[] = [];
       for (const name of orderedNames) {
         const adapter = adapterMap[name];
         if (!adapter) continue;
@@ -115,26 +127,44 @@ export function createEnrichHandler(
       }
 
       // Partition into cheap and expensive
-      const cheapAdapters = activeAdapters.filter((a) => !EXPENSIVE_ADAPTERS.has(a.name));
-      const expensiveAdapters = activeAdapters.filter((a) => EXPENSIVE_ADAPTERS.has(a.name));
+      const cheapAdapters = activeAdapters.filter(
+        (a) => !EXPENSIVE_ADAPTERS.has(a.name),
+      );
+      const expensiveAdapters = activeAdapters.filter((a) =>
+        EXPENSIVE_ADAPTERS.has(a.name),
+      );
 
       // Budget gate: estimate total cost per adapter and skip those that would exceed budget
       let budgetRemaining = options?.maxCostUsd ?? Infinity;
       const budgetedAdapters = new Set<string>();
       if (options?.maxCostUsd !== undefined) {
         for (const { name, adapter } of activeAdapters) {
-          const estimate = adapter.estimateCost({ ...({} as SearchConfig), maxCandidates: candidates.length } as SearchConfig);
+          const estimate = adapter.estimateCost({
+            maxCandidates: candidates.length,
+          });
           if (estimate.estimatedCost <= budgetRemaining) {
             budgetRemaining -= estimate.estimatedCost;
             budgetedAdapters.add(name);
           } else {
-            console.warn(`[enrich] Skipping ${name}: estimated cost $${estimate.estimatedCost.toFixed(4)} exceeds remaining budget $${budgetRemaining.toFixed(4)}`);
+            context.logger?.warn('adapter.call', {
+              phase: 'enrich',
+              adapter: name,
+              operation: 'budget_gate',
+              status: 'skipped',
+              estimatedCostUsd: estimate.estimatedCost,
+              budgetRemainingUsd: budgetRemaining,
+            });
+            console.warn(
+              `[enrich] Skipping ${name}: estimated cost $${estimate.estimatedCost.toFixed(4)} exceeds remaining budget $${budgetRemaining.toFixed(4)}`,
+            );
           }
         }
       }
 
       // Helper: filter candidates that need enrichment from a given adapter
-      const candidatesNeedingEnrichment = (adapterName: string): Candidate[] => {
+      const candidatesNeedingEnrichment = (
+        adapterName: string,
+      ): Candidate[] => {
         const now = Date.now();
         return candidates.filter((c) => {
           const existing = c.enrichments[adapterName];
@@ -144,8 +174,19 @@ export function createEnrichHandler(
       };
 
       // Helper: merge batch results into candidates
-      const mergeBatchResults = (batch: BatchResult<EnrichmentResult>) => {
+      const mergeBatchResults = (
+        batch: BatchResult<EnrichmentResult>,
+        adapterName: string,
+      ) => {
         costIncurred += batch.costIncurred;
+        context.logger?.info('adapter.call', {
+          phase: 'enrich',
+          adapter: adapterName,
+          operation: 'enrichBatch',
+          succeeded: batch.succeeded.length,
+          failed: batch.failed.length,
+          costIncurredUsd: batch.costIncurred,
+        });
 
         for (const { candidateId, result } of batch.succeeded) {
           const candidate = candidates.find((c) => c.id === candidateId);
@@ -156,10 +197,16 @@ export function createEnrichHandler(
 
           if (isReEnrich) {
             // Remove old evidence/PII from this adapter before adding new
-            const oldEvIds = new Set(candidate.enrichments[adapterName].evidence.map((e) => e.id));
-            candidate.evidence = candidate.evidence.filter((e) => !oldEvIds.has(e.id));
+            const oldEvIds = new Set(
+              candidate.enrichments[adapterName].evidence.map((e) => e.id),
+            );
+            candidate.evidence = candidate.evidence.filter(
+              (e) => !oldEvIds.has(e.id),
+            );
             const oldPiiValues = new Set(
-              candidate.enrichments[adapterName].piiFields.map((p) => `${p.adapter}:${p.value}`),
+              candidate.enrichments[adapterName].piiFields.map(
+                (p) => `${p.adapter}:${p.value}`,
+              ),
             );
             candidate.pii.fields = candidate.pii.fields.filter(
               (p) => !oldPiiValues.has(`${p.adapter}:${p.value}`),
@@ -182,26 +229,31 @@ export function createEnrichHandler(
       };
 
       // Run cheap adapters in parallel (respecting budget gate)
-      const budgetFilteredCheap = options?.maxCostUsd !== undefined
-        ? cheapAdapters.filter((a) => budgetedAdapters.has(a.name))
-        : cheapAdapters;
+      const budgetFilteredCheap =
+        options?.maxCostUsd !== undefined
+          ? cheapAdapters.filter((a) => budgetedAdapters.has(a.name))
+          : cheapAdapters;
 
       if (budgetFilteredCheap.length > 0) {
         const cheapResults = await Promise.allSettled(
-          budgetFilteredCheap.map(({ name, adapter }) => {
+          budgetFilteredCheap.map(async ({ name, adapter }) => {
             const toEnrich = candidatesNeedingEnrichment(name);
             if (toEnrich.length === 0) return Promise.resolve(null);
-            return adapter.enrichBatch(toEnrich);
+            const batch = await adapter.enrichBatch(toEnrich);
+            return { name, batch };
           }),
         );
 
         for (const result of cheapResults) {
           if (result.status === 'fulfilled' && result.value) {
-            mergeBatchResults(result.value);
+            mergeBatchResults(result.value.batch, result.value.name);
           } else if (result.status === 'rejected') {
             allFailures.push({
               item: 'adapter-batch',
-              error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+              error:
+                result.reason instanceof Error
+                  ? result.reason.message
+                  : String(result.reason),
               retryable: true,
             });
           }
@@ -211,7 +263,8 @@ export function createEnrichHandler(
       // Run expensive adapters conditionally (respecting budget gate)
       for (const { name, adapter, priority } of expensiveAdapters) {
         // Budget gate: skip if this adapter was excluded by budget
-        if (options?.maxCostUsd !== undefined && !budgetedAdapters.has(name)) continue;
+        if (options?.maxCostUsd !== undefined && !budgetedAdapters.has(name))
+          continue;
 
         // Check conditional execution
         if (priority?.runCondition === 'if_cheap_insufficient') {
@@ -226,7 +279,7 @@ export function createEnrichHandler(
 
         try {
           const batch = await adapter.enrichBatch(toEnrich);
-          mergeBatchResults(batch);
+          mergeBatchResults(batch, name);
         } catch (err) {
           allFailures.push({
             item: `adapter-${name}`,
@@ -248,12 +301,22 @@ export function createEnrichHandler(
           const email = pii.value.toLowerCase();
           const existingIdx = emailToCandidate.get(email);
 
-          if (existingIdx !== undefined && existingIdx !== i && !indicesToRemove.has(i)) {
+          if (
+            existingIdx !== undefined &&
+            existingIdx !== i &&
+            !indicesToRemove.has(i)
+          ) {
             // Merge candidate[i] into candidate[existingIdx]
             const primary = candidates[existingIdx];
             const duplicate = candidates[i];
             // H-3: never log raw PII to stdout — terminal scrollback, CI logs,
             // and redirected stdout would otherwise preserve email addresses.
+            context.logger?.info('pii.redacted', {
+              phase: 'enrich',
+              reason: 'duplicate_candidate_merge',
+              piiType: 'email',
+              redactedEmail: redactPII(email, 'email'),
+            });
             console.log(
               `[enrich] Merging duplicate: ${duplicate.name} → ${primary.name} (shared email: ${redactPII(email, 'email')})`,
             );
@@ -265,14 +328,19 @@ export function createEnrichHandler(
             }
 
             // Merge PII (deduplicate by adapter:value)
-            const existingPii = new Set(primary.pii.fields.map((p) => `${p.adapter}:${p.value}`));
+            const existingPii = new Set(
+              primary.pii.fields.map((p) => `${p.adapter}:${p.value}`),
+            );
             for (const p of duplicate.pii.fields) {
-              if (!existingPii.has(`${p.adapter}:${p.value}`)) primary.pii.fields.push(p);
+              if (!existingPii.has(`${p.adapter}:${p.value}`))
+                primary.pii.fields.push(p);
             }
 
             // Merge observed identifiers (deduplicate by type:value)
             const existingIdKeys = new Set(
-              primary.identity.observedIdentifiers.map((id) => `${id.type}:${id.value}`),
+              primary.identity.observedIdentifiers.map(
+                (id) => `${id.type}:${id.value}`,
+              ),
             );
             for (const id of duplicate.identity.observedIdentifiers) {
               if (!existingIdKeys.has(`${id.type}:${id.value}`)) {
@@ -323,36 +391,73 @@ export function createScoreHandler(
   provider: AIProvider,
 ): PhaseHandler<EnrichPhaseOutput, ScorePhaseOutput> {
   return {
-    async execute(input) {
+    async execute(input, context) {
       const scoredCandidates: ScoredCandidate[] = [];
       let costIncurred = 0;
-      const failures: { item: string; error: string; retryable: boolean }[] = [];
+      const failures: { item: string; error: string; retryable: boolean }[] =
+        [];
 
       for (const candidate of input.candidates) {
         try {
           // 5.1: Extract signals via LLM. H-7: usage is real per-call accounting.
-          const { signals, usage: extractUsage } = await extractSignals(
-            candidate,
-            talentProfile,
-            provider,
-          );
-          costIncurred += computeCost(extractUsage);
+          const {
+            signals,
+            usage: extractUsage,
+            prompt: signalPrompt,
+          } = await extractSignals(candidate, talentProfile, provider);
+          const extractCost = computeCost(extractUsage);
+          costIncurred += extractCost;
+          context.logger?.info('ai.call', {
+            phase: 'score',
+            operation: 'extractSignals',
+            provider: provider.name,
+            model: extractUsage.model,
+            candidateId: candidate.id,
+            inputTokens: extractUsage.inputTokens,
+            outputTokens: extractUsage.outputTokens,
+            cachedTokens: extractUsage.cachedTokens,
+            costIncurredUsd: extractCost,
+            promptName: signalPrompt.name,
+            promptVersion: signalPrompt.version,
+          });
 
           // 5.2: Calculate weighted score
           const score = calculateScore(signals, searchConfig.scoringWeights);
+          score.promptVersions = {
+            ...signals.promptVersions,
+          };
 
           // 5.4: Assign tier
           const tier = assignTier(score.total, searchConfig.tierThresholds);
 
           // 5.3: Generate narrative via LLM
-          const { narrative, usage: narrativeUsage } = await generateNarrative(
+          const {
+            narrative,
+            usage: narrativeUsage,
+            prompt: narrativePrompt,
+          } = await generateNarrative(
             candidate,
             talentProfile,
             signals,
             score,
             provider,
           );
-          costIncurred += computeCost(narrativeUsage);
+          const narrativeCost = computeCost(narrativeUsage);
+          costIncurred += narrativeCost;
+          score.promptVersions[narrativePrompt.name] = narrativePrompt.version;
+          context.logger?.info('ai.call', {
+            phase: 'score',
+            operation: 'generateNarrative',
+            provider: provider.name,
+            model: narrativeUsage.model,
+            candidateId: candidate.id,
+            inputTokens: narrativeUsage.inputTokens,
+            outputTokens: narrativeUsage.outputTokens,
+            cachedTokens: narrativeUsage.cachedTokens,
+            costIncurredUsd: narrativeCost,
+            promptName: narrativePrompt.name,
+            promptVersion: narrativePrompt.version,
+          });
 
           scoredCandidates.push({
             ...candidate,
@@ -439,6 +544,13 @@ export function createOutputHandler(
       for (const adapter of outputAdapters) {
         const result = await adapter.push(input.candidates, {
           outputDir: context.runDir,
+        });
+        context.logger?.info('adapter.call', {
+          phase: 'output',
+          adapter: adapter.name,
+          operation: 'push',
+          candidatesPushed: result.candidatesPushed,
+          outputLocation: result.outputLocation,
         });
         outputLocations[adapter.name] = result.outputLocation;
         candidatesPushed = result.candidatesPushed;

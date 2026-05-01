@@ -10,6 +10,7 @@ import type {
   EnrichmentResult,
   BatchResult,
   CostEstimate,
+  CostEstimateInput,
 } from '@sourcerer/core';
 import { GitHubClient, GitHubApiError } from './github-client.js';
 import type { GitHubRepo } from './github-client.js';
@@ -73,7 +74,9 @@ export class GitHubAdapter implements DataSource {
   }
 
   async *search(_config: SearchConfig): AsyncGenerator<SearchPage> {
-    throw new Error('GitHubAdapter is enrichment-only. Use enrich() or enrichBatch() instead.');
+    throw new Error(
+      'GitHubAdapter is enrichment-only. Use enrich() or enrichBatch() instead.',
+    );
   }
 
   async enrich(candidate: Candidate): Promise<EnrichmentResult> {
@@ -101,7 +104,11 @@ export class GitHubAdapter implements DataSource {
       for (const repo of topRepos) {
         await this.delay();
         try {
-          const commits = await this.client.fetchCommits(username, repo.name, 30);
+          const commits = await this.client.fetchCommits(
+            username,
+            repo.name,
+            30,
+          );
           allCommits = allCommits.concat(commits);
         } catch {
           // Skip repos where commits fail (e.g., empty repos)
@@ -129,7 +136,11 @@ export class GitHubAdapter implements DataSource {
       );
 
       // Add contribution trend evidence
-      const trendEvidence = buildContributionTrends(repos, events, user.html_url);
+      const trendEvidence = buildContributionTrends(
+        repos,
+        events,
+        user.html_url,
+      );
       evidence.push(...trendEvidence);
 
       return {
@@ -155,7 +166,8 @@ export class GitHubAdapter implements DataSource {
     const staleTtlMs = options?.staleTtlMs ?? DEFAULT_STALE_TTL_MS;
 
     const succeeded: { candidateId: string; result: EnrichmentResult }[] = [];
-    const failed: { candidateId: string; error: Error; retryable: boolean }[] = [];
+    const failed: { candidateId: string; error: Error; retryable: boolean }[] =
+      [];
 
     // Separate candidates into cached (skip) vs needs-enrichment
     const toEnrich: Candidate[] = [];
@@ -223,7 +235,7 @@ export class GitHubAdapter implements DataSource {
     }
   }
 
-  estimateCost(_config: SearchConfig): CostEstimate {
+  estimateCost(_config: CostEstimateInput): CostEstimate {
     return {
       estimatedCost: 0,
       breakdown: {},

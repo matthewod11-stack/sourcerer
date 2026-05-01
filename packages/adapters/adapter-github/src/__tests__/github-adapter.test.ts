@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GitHubAdapter, selectTopRepos } from '../github-adapter.js';
+import { ApiContractError } from '@sourcerer/core';
 import {
   extractEmailsFromCommits,
   computeLanguageDistribution,
@@ -8,8 +9,17 @@ import {
   buildContributionTrends,
   computeLanguageTrends,
 } from '../parsers.js';
-import type { Candidate, ObservedIdentifier, EnrichmentResult } from '@sourcerer/core';
-import type { GitHubCommit, GitHubRepo, GitHubEvent } from '../github-client.js';
+import type {
+  Candidate,
+  ObservedIdentifier,
+  EnrichmentResult,
+} from '@sourcerer/core';
+import {
+  GitHubClient,
+  type GitHubCommit,
+  type GitHubRepo,
+  type GitHubEvent,
+} from '../github-client.js';
 
 // --- Mock Data ---
 
@@ -27,31 +37,160 @@ const mockUser = {
 };
 
 const mockRepos: GitHubRepo[] = [
-  { name: 'defi-indexer', full_name: 'sarahchen/defi-indexer', language: 'Go', stargazers_count: 120, forks_count: 15, topics: ['defi'], updated_at: '2026-03-20T00:00:00Z', pushed_at: '2026-03-20T00:00:00Z', html_url: 'https://github.com/sarahchen/defi-indexer', fork: false },
-  { name: 'go-utils', full_name: 'sarahchen/go-utils', language: 'Go', stargazers_count: 45, forks_count: 3, topics: [], updated_at: '2026-03-15T00:00:00Z', pushed_at: '2026-03-15T00:00:00Z', html_url: 'https://github.com/sarahchen/go-utils', fork: false },
-  { name: 'rust-wasm', full_name: 'sarahchen/rust-wasm', language: 'Rust', stargazers_count: 30, forks_count: 2, topics: ['wasm'], updated_at: '2026-03-10T00:00:00Z', pushed_at: '2026-03-10T00:00:00Z', html_url: 'https://github.com/sarahchen/rust-wasm', fork: false },
-  { name: 'fork-of-something', full_name: 'sarahchen/fork-of-something', language: 'JavaScript', stargazers_count: 0, forks_count: 0, topics: [], updated_at: '2026-01-01T00:00:00Z', pushed_at: '2026-01-01T00:00:00Z', html_url: 'https://github.com/sarahchen/fork-of-something', fork: true },
+  {
+    name: 'defi-indexer',
+    full_name: 'sarahchen/defi-indexer',
+    language: 'Go',
+    stargazers_count: 120,
+    forks_count: 15,
+    topics: ['defi'],
+    updated_at: '2026-03-20T00:00:00Z',
+    pushed_at: '2026-03-20T00:00:00Z',
+    html_url: 'https://github.com/sarahchen/defi-indexer',
+    fork: false,
+  },
+  {
+    name: 'go-utils',
+    full_name: 'sarahchen/go-utils',
+    language: 'Go',
+    stargazers_count: 45,
+    forks_count: 3,
+    topics: [],
+    updated_at: '2026-03-15T00:00:00Z',
+    pushed_at: '2026-03-15T00:00:00Z',
+    html_url: 'https://github.com/sarahchen/go-utils',
+    fork: false,
+  },
+  {
+    name: 'rust-wasm',
+    full_name: 'sarahchen/rust-wasm',
+    language: 'Rust',
+    stargazers_count: 30,
+    forks_count: 2,
+    topics: ['wasm'],
+    updated_at: '2026-03-10T00:00:00Z',
+    pushed_at: '2026-03-10T00:00:00Z',
+    html_url: 'https://github.com/sarahchen/rust-wasm',
+    fork: false,
+  },
+  {
+    name: 'fork-of-something',
+    full_name: 'sarahchen/fork-of-something',
+    language: 'JavaScript',
+    stargazers_count: 0,
+    forks_count: 0,
+    topics: [],
+    updated_at: '2026-01-01T00:00:00Z',
+    pushed_at: '2026-01-01T00:00:00Z',
+    html_url: 'https://github.com/sarahchen/fork-of-something',
+    fork: true,
+  },
 ];
 
 const mockCommits: GitHubCommit[] = [
-  { sha: 'abc1', commit: { author: { name: 'Sarah Chen', email: 'sarah@gmail.com', date: '2026-03-20T10:00:00Z' }, message: 'feat: add indexer' }, html_url: 'https://github.com/sarahchen/defi-indexer/commit/abc1' },
-  { sha: 'abc2', commit: { author: { name: 'Sarah Chen', email: 'sarah@gmail.com', date: '2026-03-19T10:00:00Z' }, message: 'fix: query bug' }, html_url: 'https://github.com/sarahchen/defi-indexer/commit/abc2' },
-  { sha: 'abc3', commit: { author: { name: 'Sarah Chen', email: '12345+sarahchen@users.noreply.github.com', date: '2026-03-18T10:00:00Z' }, message: 'ci: update' }, html_url: 'https://github.com/sarahchen/defi-indexer/commit/abc3' },
-  { sha: 'abc4', commit: { author: { name: 'Sarah Chen', email: 'sarah@chainlink.com', date: '2026-03-17T10:00:00Z' }, message: 'docs: readme' }, html_url: 'https://github.com/sarahchen/defi-indexer/commit/abc4' },
+  {
+    sha: 'abc1',
+    commit: {
+      author: {
+        name: 'Sarah Chen',
+        email: 'sarah@gmail.com',
+        date: '2026-03-20T10:00:00Z',
+      },
+      message: 'feat: add indexer',
+    },
+    html_url: 'https://github.com/sarahchen/defi-indexer/commit/abc1',
+  },
+  {
+    sha: 'abc2',
+    commit: {
+      author: {
+        name: 'Sarah Chen',
+        email: 'sarah@gmail.com',
+        date: '2026-03-19T10:00:00Z',
+      },
+      message: 'fix: query bug',
+    },
+    html_url: 'https://github.com/sarahchen/defi-indexer/commit/abc2',
+  },
+  {
+    sha: 'abc3',
+    commit: {
+      author: {
+        name: 'Sarah Chen',
+        email: '12345+sarahchen@users.noreply.github.com',
+        date: '2026-03-18T10:00:00Z',
+      },
+      message: 'ci: update',
+    },
+    html_url: 'https://github.com/sarahchen/defi-indexer/commit/abc3',
+  },
+  {
+    sha: 'abc4',
+    commit: {
+      author: {
+        name: 'Sarah Chen',
+        email: 'sarah@chainlink.com',
+        date: '2026-03-17T10:00:00Z',
+      },
+      message: 'docs: readme',
+    },
+    html_url: 'https://github.com/sarahchen/defi-indexer/commit/abc4',
+  },
 ];
 
 const mockEvents: GitHubEvent[] = [
-  { id: '1', type: 'PushEvent', created_at: '2026-03-20T10:00:00Z', repo: { name: 'sarahchen/defi-indexer' }, payload: { size: 3, commits: [{ sha: 'a', message: 'feat' }, { sha: 'b', message: 'fix' }, { sha: 'c', message: 'chore' }] } },
-  { id: '2', type: 'PushEvent', created_at: '2026-03-13T10:00:00Z', repo: { name: 'sarahchen/go-utils' }, payload: { size: 2, commits: [{ sha: 'd', message: 'feat' }, { sha: 'e', message: 'fix' }] } },
-  { id: '3', type: 'PushEvent', created_at: '2026-03-06T10:00:00Z', repo: { name: 'sarahchen/rust-wasm' }, payload: { size: 1, commits: [{ sha: 'f', message: 'wip' }] } },
-  { id: '4', type: 'WatchEvent', created_at: '2026-03-05T10:00:00Z', repo: { name: 'other/repo' } },
+  {
+    id: '1',
+    type: 'PushEvent',
+    created_at: '2026-03-20T10:00:00Z',
+    repo: { name: 'sarahchen/defi-indexer' },
+    payload: {
+      size: 3,
+      commits: [
+        { sha: 'a', message: 'feat' },
+        { sha: 'b', message: 'fix' },
+        { sha: 'c', message: 'chore' },
+      ],
+    },
+  },
+  {
+    id: '2',
+    type: 'PushEvent',
+    created_at: '2026-03-13T10:00:00Z',
+    repo: { name: 'sarahchen/go-utils' },
+    payload: {
+      size: 2,
+      commits: [
+        { sha: 'd', message: 'feat' },
+        { sha: 'e', message: 'fix' },
+      ],
+    },
+  },
+  {
+    id: '3',
+    type: 'PushEvent',
+    created_at: '2026-03-06T10:00:00Z',
+    repo: { name: 'sarahchen/rust-wasm' },
+    payload: { size: 1, commits: [{ sha: 'f', message: 'wip' }] },
+  },
+  {
+    id: '4',
+    type: 'WatchEvent',
+    created_at: '2026-03-05T10:00:00Z',
+    repo: { name: 'other/repo' },
+  },
 ];
 
-const mockRateLimit = { rate: { remaining: 4999, reset: Math.floor(Date.now() / 1000) + 3600 } };
+const mockRateLimit = {
+  rate: { remaining: 4999, reset: Math.floor(Date.now() / 1000) + 3600 },
+};
 
 // --- Mock fetch ---
 
-function makeMockHeaders(remaining = '4999', reset = String(Math.floor(Date.now() / 1000) + 3600)) {
+function makeMockHeaders(
+  remaining = '4999',
+  reset = String(Math.floor(Date.now() / 1000) + 3600),
+) {
   return {
     get: (name: string) => {
       if (name === 'x-ratelimit-remaining') return remaining;
@@ -68,26 +207,60 @@ beforeEach(() => {
     const path = new URL(url).pathname;
 
     if (path === '/users/sarahchen') {
-      return { ok: true, json: async () => mockUser, headers: makeMockHeaders() };
+      return {
+        ok: true,
+        json: async () => mockUser,
+        headers: makeMockHeaders(),
+      };
     }
     if (path.startsWith('/users/sarahchen/repos')) {
-      return { ok: true, json: async () => mockRepos, headers: makeMockHeaders() };
+      return {
+        ok: true,
+        json: async () => mockRepos,
+        headers: makeMockHeaders(),
+      };
     }
     if (path.match(/\/repos\/sarahchen\/[\w-]+\/commits/)) {
-      return { ok: true, json: async () => mockCommits, headers: makeMockHeaders() };
+      return {
+        ok: true,
+        json: async () => mockCommits,
+        headers: makeMockHeaders(),
+      };
     }
     if (path.startsWith('/users/sarahchen/events')) {
-      return { ok: true, json: async () => mockEvents, headers: makeMockHeaders() };
+      return {
+        ok: true,
+        json: async () => mockEvents,
+        headers: makeMockHeaders(),
+      };
     }
     if (path === '/rate_limit') {
-      return { ok: true, json: async () => mockRateLimit, headers: makeMockHeaders() };
+      return {
+        ok: true,
+        json: async () => mockRateLimit,
+        headers: makeMockHeaders(),
+      };
     }
     if (path === '/users/nonexistent') {
-      return { ok: false, status: 404, json: async () => ({ message: 'Not Found' }), headers: makeMockHeaders() };
+      return {
+        ok: false,
+        status: 404,
+        json: async () => ({ message: 'Not Found' }),
+        headers: makeMockHeaders(),
+      };
     }
     // Private profile user — user exists but repos are empty
     if (path === '/users/privateuser') {
-      return { ok: true, json: async () => ({ ...mockUser, login: 'privateuser', public_repos: 0, html_url: 'https://github.com/privateuser' }), headers: makeMockHeaders() };
+      return {
+        ok: true,
+        json: async () => ({
+          ...mockUser,
+          login: 'privateuser',
+          public_repos: 0,
+          html_url: 'https://github.com/privateuser',
+        }),
+        headers: makeMockHeaders(),
+      };
     }
     if (path.startsWith('/users/privateuser/repos')) {
       return { ok: true, json: async () => [], headers: makeMockHeaders() };
@@ -121,7 +294,11 @@ function makeCandidate(username?: string, id = 'test-candidate'): Candidate {
   }
   return {
     id,
-    identity: { canonicalId: id, observedIdentifiers: identifiers, mergeConfidence: 1 },
+    identity: {
+      canonicalId: id,
+      observedIdentifiers: identifiers,
+      mergeConfidence: 1,
+    },
     name: 'Sarah Chen',
     sources: {},
     evidence: [],
@@ -139,7 +316,16 @@ function makeCandidateWithEnrichment(
   candidate.enrichments['github'] = {
     adapter: 'github',
     candidateId: id,
-    evidence: [{ id: 'ev-cached', claim: 'cached', source: 'test', adapter: 'github', retrievedAt: enrichedAt, confidence: 'high' }],
+    evidence: [
+      {
+        id: 'ev-cached',
+        claim: 'cached',
+        source: 'test',
+        adapter: 'github',
+        retrievedAt: enrichedAt,
+        confidence: 'high',
+      },
+    ],
     piiFields: [],
     sourceData: { adapter: 'github', retrievedAt: enrichedAt, urls: [] },
     enrichedAt,
@@ -150,10 +336,7 @@ function makeCandidateWithEnrichment(
 // --- Tests ---
 
 describe('selectTopRepos (H-10 stable sort)', () => {
-  type RepoFixture = Pick<
-    GitHubRepo,
-    'name' | 'stargazers_count' | 'fork'
-  > &
+  type RepoFixture = Pick<GitHubRepo, 'name' | 'stargazers_count' | 'fork'> &
     Partial<GitHubRepo>;
 
   // LCG-based shuffle so test outcome is reproducible.
@@ -161,7 +344,7 @@ describe('selectTopRepos (H-10 stable sort)', () => {
     const a = [...arr];
     let s = seed >>> 0;
     for (let i = a.length - 1; i > 0; i--) {
-      s = ((s * 1103515245) + 12345) >>> 0;
+      s = (s * 1103515245 + 12345) >>> 0;
       const j = s % (i + 1);
       [a[i], a[j]] = [a[j], a[i]];
     }
@@ -194,7 +377,9 @@ describe('selectTopRepos (H-10 stable sort)', () => {
       makeRepo('echo', 10),
     ];
 
-    const expected = selectTopRepos(repos as GitHubRepo[], 3).map((r) => r.name);
+    const expected = selectTopRepos(repos as GitHubRepo[], 3).map(
+      (r) => r.name,
+    );
     expect(expected).toEqual(['alpha', 'beta', 'charlie']);
 
     for (let seed = 1; seed <= 100; seed++) {
@@ -216,6 +401,46 @@ describe('selectTopRepos (H-10 stable sort)', () => {
 
     const result = selectTopRepos(repos as GitHubRepo[], 3).map((r) => r.name);
     expect(result).toEqual(['zebra', 'alpha', 'beta']);
+  });
+});
+
+describe('GitHubClient API contract validation (H-11)', () => {
+  it('throws ApiContractError with the missing field path', async () => {
+    mockFetch.mockImplementation(async () => ({
+      ok: true,
+      json: async () => {
+        const { public_repos: _publicRepos, ...userWithoutRepos } = mockUser;
+        return userWithoutRepos;
+      },
+      headers: makeMockHeaders(),
+    }));
+
+    const client = new GitHubClient('test-token');
+    const error = await client
+      .fetchUser('sarahchen')
+      .catch((err: unknown) => err);
+    expect(error).toBeInstanceOf(ApiContractError);
+    expect(error).toMatchObject({
+      adapter: 'github',
+      fieldPaths: ['public_repos'],
+    });
+  });
+
+  it('warns on unknown fields without rejecting the response', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockFetch.mockImplementation(async () => ({
+      ok: true,
+      json: async () => ({ ...mockUser, unexpected_field: 'new-api-field' }),
+      headers: makeMockHeaders(),
+    }));
+
+    const client = new GitHubClient('test-token');
+    await expect(client.fetchUser('sarahchen')).resolves.toMatchObject({
+      login: 'sarahchen',
+    });
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('unexpected_field'),
+    );
   });
 });
 
@@ -278,7 +503,12 @@ describe('computeCommitFrequency', () => {
 
   it('returns dormant for no push events', () => {
     const watchOnly: GitHubEvent[] = [
-      { id: '1', type: 'WatchEvent', created_at: '2026-03-20T10:00:00Z', repo: { name: 'test/repo' } },
+      {
+        id: '1',
+        type: 'WatchEvent',
+        created_at: '2026-03-20T10:00:00Z',
+        repo: { name: 'test/repo' },
+      },
     ];
     const freq = computeCommitFrequency(watchOnly);
     expect(freq.status).toBe('dormant');
@@ -308,9 +538,42 @@ describe('computeCommitFrequency', () => {
 describe('computeLanguageTrends', () => {
   it('identifies growing languages', () => {
     const recentRepos: GitHubRepo[] = [
-      { name: 'r1', full_name: 'u/r1', language: 'Rust', stargazers_count: 0, forks_count: 0, topics: [], updated_at: '2026-03-20T00:00:00Z', pushed_at: '2026-03-20T00:00:00Z', html_url: '', fork: false },
-      { name: 'r2', full_name: 'u/r2', language: 'Rust', stargazers_count: 0, forks_count: 0, topics: [], updated_at: '2026-03-18T00:00:00Z', pushed_at: '2026-03-18T00:00:00Z', html_url: '', fork: false },
-      { name: 'r3', full_name: 'u/r3', language: 'Go', stargazers_count: 0, forks_count: 0, topics: [], updated_at: '2025-01-01T00:00:00Z', pushed_at: '2025-01-01T00:00:00Z', html_url: '', fork: false },
+      {
+        name: 'r1',
+        full_name: 'u/r1',
+        language: 'Rust',
+        stargazers_count: 0,
+        forks_count: 0,
+        topics: [],
+        updated_at: '2026-03-20T00:00:00Z',
+        pushed_at: '2026-03-20T00:00:00Z',
+        html_url: '',
+        fork: false,
+      },
+      {
+        name: 'r2',
+        full_name: 'u/r2',
+        language: 'Rust',
+        stargazers_count: 0,
+        forks_count: 0,
+        topics: [],
+        updated_at: '2026-03-18T00:00:00Z',
+        pushed_at: '2026-03-18T00:00:00Z',
+        html_url: '',
+        fork: false,
+      },
+      {
+        name: 'r3',
+        full_name: 'u/r3',
+        language: 'Go',
+        stargazers_count: 0,
+        forks_count: 0,
+        topics: [],
+        updated_at: '2025-01-01T00:00:00Z',
+        pushed_at: '2025-01-01T00:00:00Z',
+        html_url: '',
+        fork: false,
+      },
     ];
     const trends = computeLanguageTrends(recentRepos, 6);
     const rustTrend = trends.find((t) => t.language === 'Rust');
@@ -320,7 +583,11 @@ describe('computeLanguageTrends', () => {
 
 describe('buildContributionTrends', () => {
   it('produces evidence items for OSS ratio and commit frequency', () => {
-    const evidence = buildContributionTrends(mockRepos, mockEvents, 'https://github.com/sarahchen');
+    const evidence = buildContributionTrends(
+      mockRepos,
+      mockEvents,
+      'https://github.com/sarahchen',
+    );
     expect(evidence.length).toBeGreaterThanOrEqual(2);
     expect(evidence.every((e) => e.id.startsWith('ev-'))).toBe(true);
     expect(evidence.every((e) => e.adapter === 'github')).toBe(true);
@@ -330,17 +597,25 @@ describe('buildContributionTrends', () => {
     expect(ossEvidence).toBeDefined();
 
     // Should have commit frequency evidence
-    const freqEvidence = evidence.find((e) => e.claim.includes('Commit frequency'));
+    const freqEvidence = evidence.find((e) =>
+      e.claim.includes('Commit frequency'),
+    );
     expect(freqEvidence).toBeDefined();
   });
 
   it('handles empty events gracefully', () => {
-    const evidence = buildContributionTrends(mockRepos, [], 'https://github.com/test');
+    const evidence = buildContributionTrends(
+      mockRepos,
+      [],
+      'https://github.com/test',
+    );
     // Should still produce OSS ratio evidence
     const ossEvidence = evidence.find((e) => e.claim.includes('OSS ratio'));
     expect(ossEvidence).toBeDefined();
     // No commit frequency evidence with empty events
-    const freqEvidence = evidence.find((e) => e.claim.includes('Commit frequency'));
+    const freqEvidence = evidence.find((e) =>
+      e.claim.includes('Commit frequency'),
+    );
     expect(freqEvidence).toBeUndefined();
   });
 });
@@ -373,7 +648,9 @@ describe('GitHubAdapter', () => {
     });
 
     it('handles GitHub URL as identifier', async () => {
-      const result = await adapter.enrich(makeCandidate('https://github.com/sarahchen'));
+      const result = await adapter.enrich(
+        makeCandidate('https://github.com/sarahchen'),
+      );
       expect(result.evidence.length).toBeGreaterThanOrEqual(3);
     });
 
@@ -390,7 +667,9 @@ describe('GitHubAdapter', () => {
 
     it('includes contribution trend evidence', async () => {
       const result = await adapter.enrich(makeCandidate('sarahchen'));
-      const ossEvidence = result.evidence.find((e) => e.claim.includes('OSS ratio'));
+      const ossEvidence = result.evidence.find((e) =>
+        e.claim.includes('OSS ratio'),
+      );
       expect(ossEvidence).toBeDefined();
     });
 
@@ -399,10 +678,14 @@ describe('GitHubAdapter', () => {
       expect(result.adapter).toBe('github');
       expect(result.candidateId).toBe('test-candidate');
       // Should still have profile overview evidence at minimum
-      const profileEvidence = result.evidence.find((e) => e.claim.includes('GitHub profile'));
+      const profileEvidence = result.evidence.find((e) =>
+        e.claim.includes('GitHub profile'),
+      );
       expect(profileEvidence).toBeDefined();
       // Should not have language evidence since no repos
-      const langEvidence = result.evidence.find((e) => e.claim.includes('Top languages'));
+      const langEvidence = result.evidence.find((e) =>
+        e.claim.includes('Top languages'),
+      );
       expect(langEvidence).toBeUndefined();
     });
   });
@@ -446,7 +729,9 @@ describe('GitHubAdapter', () => {
 
       expect(result.succeeded).toHaveLength(2);
       // The cached candidate should use existing enrichment, not fetch
-      const cachedResult = result.succeeded.find((s) => s.candidateId === 'cached-1');
+      const cachedResult = result.succeeded.find(
+        (s) => s.candidateId === 'cached-1',
+      );
       expect(cachedResult).toBeDefined();
       expect(cachedResult!.result.enrichedAt).toBe(freshEnrichedAt);
       // The cached evidence should be the one we set, not freshly fetched
@@ -455,7 +740,9 @@ describe('GitHubAdapter', () => {
 
     it('re-enriches candidates with stale enrichment (beyond TTL)', async () => {
       // Set enrichedAt to 48 hours ago — beyond default 24h TTL
-      const staleDate = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+      const staleDate = new Date(
+        Date.now() - 48 * 60 * 60 * 1000,
+      ).toISOString();
       const candidates = [
         makeCandidateWithEnrichment('sarahchen', 'stale-1', staleDate),
       ];
@@ -466,7 +753,9 @@ describe('GitHubAdapter', () => {
       // Should have been re-enriched — enrichedAt should be more recent than the stale date
       const enriched = result.succeeded[0];
       expect(enriched.candidateId).toBe('stale-1');
-      expect(new Date(enriched.result.enrichedAt).getTime()).toBeGreaterThan(new Date(staleDate).getTime());
+      expect(new Date(enriched.result.enrichedAt).getTime()).toBeGreaterThan(
+        new Date(staleDate).getTime(),
+      );
       // Should have real evidence, not the cached one
       expect(enriched.result.evidence.length).toBeGreaterThan(1);
     });
@@ -494,21 +783,49 @@ describe('GitHubAdapter', () => {
         if (path.match(/\/users\/candidate-\d+$/)) {
           callCount++;
           if (callCount > 5) {
-            return { ok: false, status: 403, json: async () => ({ message: 'rate limit exceeded' }), headers: makeMockHeaders('0') };
+            return {
+              ok: false,
+              status: 403,
+              json: async () => ({ message: 'rate limit exceeded' }),
+              headers: makeMockHeaders('0'),
+            };
           }
-          return { ok: true, json: async () => ({ ...mockUser, login: `candidate-${callCount}` }), headers: makeMockHeaders() };
+          return {
+            ok: true,
+            json: async () => ({
+              ...mockUser,
+              login: `candidate-${callCount}`,
+            }),
+            headers: makeMockHeaders(),
+          };
         }
         if (path.match(/\/users\/candidate-\d+\/repos/)) {
-          return { ok: true, json: async () => mockRepos, headers: makeMockHeaders() };
+          return {
+            ok: true,
+            json: async () => mockRepos,
+            headers: makeMockHeaders(),
+          };
         }
         if (path.match(/\/repos\/candidate-\d+\//)) {
-          return { ok: true, json: async () => mockCommits, headers: makeMockHeaders() };
+          return {
+            ok: true,
+            json: async () => mockCommits,
+            headers: makeMockHeaders(),
+          };
         }
         if (path.match(/\/users\/candidate-\d+\/events/)) {
-          return { ok: true, json: async () => mockEvents, headers: makeMockHeaders() };
+          return {
+            ok: true,
+            json: async () => mockEvents,
+            headers: makeMockHeaders(),
+          };
         }
         if (path === '/rate_limit') {
-          return { ok: true, json: async () => mockRateLimit, headers: makeMockHeaders() };
+          return {
+            ok: true,
+            json: async () => mockRateLimit,
+            headers: makeMockHeaders(),
+          };
         }
 
         return { ok: true, json: async () => ({}), headers: makeMockHeaders() };
@@ -536,10 +853,20 @@ describe('GitHubAdapter', () => {
 
         // Make specific candidates fail with different errors
         if (path.match(/\/users\/fail-404$/)) {
-          return { ok: false, status: 404, json: async () => ({ message: 'Not Found' }), headers: makeMockHeaders() };
+          return {
+            ok: false,
+            status: 404,
+            json: async () => ({ message: 'Not Found' }),
+            headers: makeMockHeaders(),
+          };
         }
         if (path.match(/\/users\/fail-500$/)) {
-          return { ok: false, status: 500, json: async () => ({ message: 'Server Error' }), headers: makeMockHeaders() };
+          return {
+            ok: false,
+            status: 500,
+            json: async () => ({ message: 'Server Error' }),
+            headers: makeMockHeaders(),
+          };
         }
         if (path.match(/\/users\/fail-timeout$/)) {
           throw new Error('network timeout');
@@ -547,16 +874,32 @@ describe('GitHubAdapter', () => {
 
         // Default success paths
         if (path.match(/\/users\/[\w-]+$/)) {
-          return { ok: true, json: async () => mockUser, headers: makeMockHeaders() };
+          return {
+            ok: true,
+            json: async () => mockUser,
+            headers: makeMockHeaders(),
+          };
         }
         if (path.match(/\/users\/[\w-]+\/repos/)) {
-          return { ok: true, json: async () => mockRepos, headers: makeMockHeaders() };
+          return {
+            ok: true,
+            json: async () => mockRepos,
+            headers: makeMockHeaders(),
+          };
         }
         if (path.match(/\/repos\/[\w-]+\/[\w-]+\/commits/)) {
-          return { ok: true, json: async () => mockCommits, headers: makeMockHeaders() };
+          return {
+            ok: true,
+            json: async () => mockCommits,
+            headers: makeMockHeaders(),
+          };
         }
         if (path.match(/\/users\/[\w-]+\/events/)) {
-          return { ok: true, json: async () => mockEvents, headers: makeMockHeaders() };
+          return {
+            ok: true,
+            json: async () => mockEvents,
+            headers: makeMockHeaders(),
+          };
         }
 
         return { ok: true, json: async () => ({}), headers: makeMockHeaders() };
@@ -592,16 +935,7 @@ describe('GitHubAdapter', () => {
 
   describe('estimateCost()', () => {
     it('returns zero cost', () => {
-      const estimate = adapter.estimateCost({
-        roleName: 'Test',
-        tiers: [],
-        scoringWeights: {},
-        tierThresholds: { tier1MinScore: 70, tier2MinScore: 40 },
-        enrichmentPriority: [],
-        antiFilters: [],
-        createdAt: '2026-03-23T00:00:00Z',
-        version: 1,
-      });
+      const estimate = adapter.estimateCost({ maxCandidates: 20 });
       expect(estimate.estimatedCost).toBe(0);
       expect(estimate.currency).toBe('USD');
     });

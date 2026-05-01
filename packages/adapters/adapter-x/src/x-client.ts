@@ -1,5 +1,8 @@
 // X/Twitter REST API client — bare fetch wrapper
 
+import { parseApiContractPayload, warnApiContractUnknownFields } from '@sourcerer/core';
+import { z } from 'zod';
+
 const X_API_BASE = 'https://api.twitter.com/2';
 
 // --- Types ---
@@ -43,6 +46,47 @@ interface ApiResponse<T> {
   data: T;
   rateLimit: RateLimitInfo;
 }
+
+const XPublicMetricsSchema = z
+  .object({
+    followers_count: z.number(),
+    following_count: z.number(),
+    tweet_count: z.number(),
+  })
+  .passthrough();
+
+const XUserSchema = z
+  .object({
+    id: z.string(),
+    username: z.string(),
+    name: z.string(),
+    description: z.string(),
+    location: z.string().optional(),
+    public_metrics: XPublicMetricsSchema,
+    created_at: z.string(),
+    protected: z.boolean(),
+    url: z.string().optional(),
+  })
+  .passthrough();
+
+const XTweetSchema = z
+  .object({
+    id: z.string(),
+    text: z.string(),
+    created_at: z.string(),
+    public_metrics: z
+      .object({
+        like_count: z.number(),
+        retweet_count: z.number(),
+        reply_count: z.number(),
+        impression_count: z.number().optional(),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+
+const XUserResponseSchema = z.object({ data: XUserSchema }).passthrough();
+const XTweetsResponseSchema = z.object({ data: z.array(XTweetSchema).optional() }).passthrough();
 
 // Tier-based rate limits (requests per minute)
 const TIER_RATE_LIMITS: Record<XTier, number> = {
@@ -91,22 +135,23 @@ export class XClient {
 
   async fetchUser(handle: string): Promise<XUser> {
     const fields = 'description,public_metrics,location,created_at,protected,url';
-    const { data } = await this.get<{ data: XUser }>(
-      `/users/by/username/${encodeURIComponent(handle)}?user.fields=${fields}`,
-    );
+    const path = `/users/by/username/${encodeURIComponent(handle)}?user.fields=${fields}`;
+    const { data } = await this.get(path, XUserResponseSchema);
     return data.data;
   }
 
   async fetchRecentTweets(userId: string, maxResults = 50): Promise<XTweet[]> {
     const fields = 'created_at,public_metrics,text';
     const clamped = Math.min(Math.max(maxResults, 5), 100);
-    const { data } = await this.get<{ data?: XTweet[] }>(
-      `/users/${encodeURIComponent(userId)}/tweets?tweet.fields=${fields}&max_results=${clamped}`,
-    );
+    const path = `/users/${encodeURIComponent(userId)}/tweets?tweet.fields=${fields}&max_results=${clamped}`;
+    const { data } = await this.get(path, XTweetsResponseSchema);
     return data.data ?? [];
   }
 
-  async checkRateLimit(): Promise<{ remaining: number | null; resetAt: Date | null }> {
+  async checkRateLimit(): Promise<{
+    remaining: number | null;
+    resetAt: Date | null;
+  }> {
     // X API doesn't have a dedicated rate limit endpoint like GitHub.
     // We make a lightweight user lookup to inspect headers.
     // For healthCheck we use the known account 'X' (formerly Twitter).
@@ -130,7 +175,7 @@ export class XClient {
     };
   }
 
-  private async get<T>(path: string): Promise<ApiResponse<T>> {
+  private async get<T>(path: string, schema: z.ZodType<T, z.ZodTypeDef, unknown>): Promise<ApiResponse<T>> {
     const response = await fetch(`${X_API_BASE}${path}`, {
       headers: this.headers,
     });
@@ -143,7 +188,9 @@ export class XClient {
       let retryAfterMs: number | undefined;
 
       try {
-        const body = (await response.json()) as { errors?: Array<{ code?: string }> };
+        const body = (await response.json()) as {
+          errors?: Array<{ code?: string }>;
+        };
         code = body.errors?.[0]?.code;
       } catch {
         // Ignore parse errors
@@ -164,7 +211,12 @@ export class XClient {
       throw new XApiError(status, `X API ${status}: ${path}`, code);
     }
 
-    const data = (await response.json()) as T;
+    const payload = await response.json();
+    const data = parseApiContractPayload(payload, schema, {
+      adapter: 'x',
+      endpoint: path,
+      warn: warnApiContractUnknownFields,
+    });
     return { data, rateLimit };
   }
 }

@@ -1,5 +1,8 @@
 // GitHub REST API client — bare fetch wrapper
 
+import { parseApiContractPayload, warnApiContractUnknownFields } from '@sourcerer/core';
+import { z } from 'zod';
+
 const GITHUB_API = 'https://api.github.com';
 
 export interface GitHubUser {
@@ -70,6 +73,85 @@ export interface ApiResponse<T> {
   rateLimit: RateLimitHeaders;
 }
 
+const NullableStringSchema = z.string().nullable();
+
+const GitHubUserSchema = z
+  .object({
+    login: z.string(),
+    name: NullableStringSchema,
+    bio: NullableStringSchema,
+    company: NullableStringSchema,
+    location: NullableStringSchema,
+    email: NullableStringSchema,
+    public_repos: z.number(),
+    followers: z.number(),
+    created_at: z.string(),
+    html_url: z.string(),
+  })
+  .passthrough();
+
+const GitHubRepoSchema = z
+  .object({
+    name: z.string(),
+    full_name: z.string(),
+    language: NullableStringSchema,
+    stargazers_count: z.number(),
+    forks_count: z.number(),
+    topics: z.array(z.string()).default([]),
+    updated_at: z.string(),
+    created_at: z.string().optional(),
+    pushed_at: z.string().optional(),
+    html_url: z.string(),
+    fork: z.boolean(),
+  })
+  .passthrough();
+
+const GitHubCommitSchema = z
+  .object({
+    sha: z.string(),
+    commit: z
+      .object({
+        author: z
+          .object({
+            name: z.string(),
+            email: z.string(),
+            date: z.string(),
+          })
+          .passthrough(),
+        message: z.string(),
+      })
+      .passthrough(),
+    html_url: z.string(),
+  })
+  .passthrough();
+
+const GitHubEventSchema = z
+  .object({
+    id: z.string(),
+    type: z.string(),
+    created_at: z.string(),
+    repo: z.object({ name: z.string() }).passthrough(),
+    payload: z
+      .object({
+        commits: z.array(z.object({ sha: z.string(), message: z.string() }).passthrough()).optional(),
+        size: z.number().optional(),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
+
+const GitHubRateLimitSchema = z
+  .object({
+    rate: z
+      .object({
+        remaining: z.number(),
+        reset: z.number(),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+
 export class GitHubClient {
   private headers: Record<string, string>;
   readonly authenticated: boolean;
@@ -86,33 +168,31 @@ export class GitHubClient {
   }
 
   async fetchUser(username: string): Promise<GitHubUser> {
-    const { data } = await this.get<GitHubUser>(`/users/${encodeURIComponent(username)}`);
+    const path = `/users/${encodeURIComponent(username)}`;
+    const { data } = await this.get(path, GitHubUserSchema);
     return data;
   }
 
   async fetchRepos(username: string, perPage = 20): Promise<GitHubRepo[]> {
-    const { data } = await this.get<GitHubRepo[]>(
-      `/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=${perPage}`,
-    );
+    const path = `/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=${perPage}`;
+    const { data } = await this.get(path, z.array(GitHubRepoSchema));
     return data;
   }
 
   async fetchCommits(owner: string, repo: string, perPage = 30): Promise<GitHubCommit[]> {
-    const { data } = await this.get<GitHubCommit[]>(
-      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?per_page=${perPage}`,
-    );
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?per_page=${perPage}`;
+    const { data } = await this.get(path, z.array(GitHubCommitSchema));
     return data;
   }
 
   async fetchUserEvents(username: string): Promise<GitHubEvent[]> {
-    const { data } = await this.get<GitHubEvent[]>(
-      `/users/${encodeURIComponent(username)}/events?per_page=100`,
-    );
+    const path = `/users/${encodeURIComponent(username)}/events?per_page=100`;
+    const { data } = await this.get(path, z.array(GitHubEventSchema));
     return data;
   }
 
   async checkRateLimit(): Promise<RateLimitInfo> {
-    const { data } = await this.get<{ rate: { remaining: number; reset: number } }>('/rate_limit');
+    const { data } = await this.get('/rate_limit', GitHubRateLimitSchema);
     return {
       remaining: data.rate.remaining,
       resetAt: new Date(data.rate.reset * 1000),
@@ -128,7 +208,7 @@ export class GitHubClient {
     };
   }
 
-  private async get<T>(path: string): Promise<ApiResponse<T>> {
+  private async get<T>(path: string, schema: z.ZodType<T, z.ZodTypeDef, unknown>): Promise<ApiResponse<T>> {
     const response = await fetch(`${GITHUB_API}${path}`, {
       headers: this.headers,
     });
@@ -139,18 +219,10 @@ export class GitHubClient {
       const status = response.status;
       // Differentiate 403 (rate limit) from 404 (not found)
       if (status === 403) {
-        throw new GitHubApiError(
-          403,
-          `GitHub API rate limit exceeded: ${path}`,
-          rateLimit,
-        );
+        throw new GitHubApiError(403, `GitHub API rate limit exceeded: ${path}`, rateLimit);
       }
       if (status === 429) {
-        throw new GitHubApiError(
-          429,
-          `GitHub API rate limited (429): ${path}`,
-          rateLimit,
-        );
+        throw new GitHubApiError(429, `GitHub API rate limited (429): ${path}`, rateLimit);
       }
       if (status === 404) {
         throw new GitHubApiError(404, `GitHub API not found: ${path}`, rateLimit);
@@ -158,7 +230,12 @@ export class GitHubClient {
       throw new GitHubApiError(status, `GitHub API ${status}: ${path}`, rateLimit);
     }
 
-    const data = (await response.json()) as T;
+    const payload = await response.json();
+    const data = parseApiContractPayload(payload, schema, {
+      adapter: 'github',
+      endpoint: path,
+      warn: warnApiContractUnknownFields,
+    });
     return { data, rateLimit };
   }
 }
