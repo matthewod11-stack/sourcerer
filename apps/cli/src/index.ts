@@ -82,6 +82,20 @@ async function main(): Promise<void> {
     return;
   }
 
+  // Replay command
+  if (command === 'replay') {
+    const { replayCommand } = await import('./commands/replay.js');
+    await replayCommand(args.slice(1));
+    return;
+  }
+
+  // Eval command
+  if (command === 'eval') {
+    const { evalCommand } = await import('./commands/eval.js');
+    await evalCommand(args.slice(1));
+    return;
+  }
+
   // Candidates command
   if (command === 'candidates') {
     const { candidatesCommand } = await import('./commands/candidates.js');

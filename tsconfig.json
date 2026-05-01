@@ -6,6 +6,7 @@
     { "path": "packages/adapters/adapter-exa" },
     { "path": "packages/adapters/adapter-github" },
     { "path": "packages/scoring" },
+    { "path": "packages/eval" },
     { "path": "packages/output/output-json" },
     { "path": "packages/output/output-markdown" },
     { "path": "packages/ai" },

@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { ResponseCache, generateCacheKey, CACHE_TTL } from '../response-cache.js';
+import {
+  ResponseCache,
+  generateCacheKey,
+  CACHE_TTL,
+} from '../response-cache.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -39,6 +43,12 @@ describe('generateCacheKey', () => {
     const key1 = generateCacheKey('hello', 'gpt-4o', schema);
     const key2 = generateCacheKey('hello', 'gpt-4o', schema);
     expect(key1).toBe(key2);
+  });
+
+  it('includes namespace in hash when provided', () => {
+    const key1 = generateCacheKey('hello', 'gpt-4o', undefined, 'scoring:v1');
+    const key2 = generateCacheKey('hello', 'gpt-4o', undefined, 'scoring:v2');
+    expect(key1).not.toBe(key2);
   });
 });
 
@@ -89,6 +99,15 @@ describe('ResponseCache', () => {
       await cache.set('key-1', 'old', 'gpt-4o');
       await cache.set('key-1', 'new', 'gpt-4o');
       expect(await cache.get('key-1')).toBe('new');
+    });
+
+    it('generates namespace-specific keys', () => {
+      const cacheA = new ResponseCache({ cacheDir, namespace: 'scoring:v1' });
+      const cacheB = new ResponseCache({ cacheDir, namespace: 'scoring:v2' });
+
+      expect(cacheA.generateKey('prompt', 'gpt-4o')).not.toBe(
+        cacheB.generateKey('prompt', 'gpt-4o'),
+      );
     });
   });
 

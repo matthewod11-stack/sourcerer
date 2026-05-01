@@ -22,6 +22,7 @@
     "@sourcerer/adapter-x": "workspace:*",
     "@sourcerer/ai": "workspace:*",
     "@sourcerer/core": "workspace:*",
+    "@sourcerer/eval": "workspace:*",
     "@sourcerer/intake": "workspace:*",
     "@sourcerer/output-csv": "workspace:*",
     "@sourcerer/output-json": "workspace:*",

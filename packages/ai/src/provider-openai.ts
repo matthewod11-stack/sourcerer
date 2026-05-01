@@ -12,7 +12,6 @@ import type {
   TokenUsage,
 } from '@sourcerer/core';
 import type { ResponseCache } from './response-cache.js';
-import { generateCacheKey } from './response-cache.js';
 
 /** Default model for the OpenAI provider */
 export const DEFAULT_MODEL = 'gpt-4o';
@@ -116,8 +115,10 @@ export class OpenAIProvider implements AIProvider {
     // reports zero usage (no API call → no current cost). H-7 accepts this
     // simplification; "savings via cache" is a future enhancement.
     if (this.cache) {
-      const promptText = messages.map((m) => `${m.role}:${m.content}`).join('\n');
-      const cacheKey = generateCacheKey(promptText, model);
+      const promptText = messages
+        .map((m) => `${m.role}:${m.content}`)
+        .join('\n');
+      const cacheKey = this.cache.generateKey(promptText, model);
       const cached = await this.cache.get(cacheKey);
       if (cached) {
         return {
@@ -149,8 +150,10 @@ export class OpenAIProvider implements AIProvider {
 
     // Store in cache
     if (this.cache) {
-      const promptText = messages.map((m) => `${m.role}:${m.content}`).join('\n');
-      const cacheKey = generateCacheKey(promptText, model);
+      const promptText = messages
+        .map((m) => `${m.role}:${m.content}`)
+        .join('\n');
+      const cacheKey = this.cache.generateKey(promptText, model);
       await this.cache.set(cacheKey, result, model);
     }
 
@@ -204,7 +207,9 @@ export class OpenAIProvider implements AIProvider {
         // Parse JSON — handle potential markdown fences
         let jsonStr = raw.trim();
         if (jsonStr.startsWith('```')) {
-          jsonStr = jsonStr.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+          jsonStr = jsonStr
+            .replace(/^```(?:json)?\n?/, '')
+            .replace(/\n?```$/, '');
         }
 
         const parsed: unknown = JSON.parse(jsonStr);

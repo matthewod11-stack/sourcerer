@@ -1,7 +1,14 @@
 // Response cache — file-based caching of LLM responses keyed by SHA-256 hash
 
 import { createHash } from 'node:crypto';
-import { readFile, writeFile, unlink, readdir, mkdir, rm } from 'node:fs/promises';
+import {
+  readFile,
+  writeFile,
+  unlink,
+  readdir,
+  mkdir,
+  rm,
+} from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -22,6 +29,8 @@ export interface CacheConfig {
   defaultTtlMs?: number;
   /** Whether caching is enabled. Defaults to true. */
   enabled?: boolean;
+  /** Optional namespace included in cache keys. Used to intentionally bust one call family. */
+  namespace?: string;
 }
 
 /** Predefined TTL constants */
@@ -42,8 +51,12 @@ export function generateCacheKey(
   promptText: string,
   model: string,
   schema?: unknown,
+  namespace?: string,
 ): string {
   const hash = createHash('sha256');
+  if (namespace !== undefined) {
+    hash.update(namespace);
+  }
   hash.update(promptText);
   hash.update(model);
   if (schema !== undefined) {
@@ -59,11 +72,17 @@ export class ResponseCache {
   private readonly cacheDir: string;
   private readonly defaultTtlMs: number;
   private readonly enabled: boolean;
+  private readonly namespace?: string;
 
   constructor(config: CacheConfig = {}) {
     this.cacheDir = config.cacheDir ?? DEFAULT_CACHE_DIR;
     this.defaultTtlMs = config.defaultTtlMs ?? DEFAULT_TTL_MS;
     this.enabled = config.enabled ?? true;
+    this.namespace = config.namespace;
+  }
+
+  generateKey(promptText: string, model: string, schema?: unknown): string {
+    return generateCacheKey(promptText, model, schema, this.namespace);
   }
 
   /**

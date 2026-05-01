@@ -12,7 +12,6 @@ import type {
   TokenUsage,
 } from '@sourcerer/core';
 import type { ResponseCache } from './response-cache.js';
-import { generateCacheKey } from './response-cache.js';
 
 /** Default model for the Anthropic provider — Sonnet 4.6 (H-4) */
 export const DEFAULT_MODEL = 'claude-sonnet-4-6';
@@ -88,7 +87,8 @@ function splitMessages(messages: Message[]): {
   messages: Array<{ role: 'user' | 'assistant'; content: string }>;
 } {
   let system: string | undefined;
-  const apiMessages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+  const apiMessages: Array<{ role: 'user' | 'assistant'; content: string }> =
+    [];
 
   for (const msg of messages) {
     if (msg.role === 'system') {
@@ -126,8 +126,10 @@ export class AnthropicProvider implements AIProvider {
     // reports zero usage (no API call → no current cost). H-7 accepts this
     // simplification; "savings via cache" is a future enhancement.
     if (this.cache) {
-      const promptText = messages.map((m) => `${m.role}:${m.content}`).join('\n');
-      const cacheKey = generateCacheKey(promptText, model);
+      const promptText = messages
+        .map((m) => `${m.role}:${m.content}`)
+        .join('\n');
+      const cacheKey = this.cache.generateKey(promptText, model);
       const cached = await this.cache.get(cacheKey);
       if (cached) {
         return {
@@ -146,8 +148,12 @@ export class AnthropicProvider implements AIProvider {
           max_tokens: options?.maxTokens ?? 4096,
           ...(system ? { system } : {}),
           messages: apiMessages,
-          ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
-          ...(options?.stopSequences?.length ? { stop_sequences: options.stopSequences } : {}),
+          ...(options?.temperature !== undefined
+            ? { temperature: options.temperature }
+            : {}),
+          ...(options?.stopSequences?.length
+            ? { stop_sequences: options.stopSequences }
+            : {}),
         }),
       3,
     );
@@ -160,8 +166,10 @@ export class AnthropicProvider implements AIProvider {
 
     // Store in cache
     if (this.cache) {
-      const promptText = messages.map((m) => `${m.role}:${m.content}`).join('\n');
-      const cacheKey = generateCacheKey(promptText, model);
+      const promptText = messages
+        .map((m) => `${m.role}:${m.content}`)
+        .join('\n');
+      const cacheKey = this.cache.generateKey(promptText, model);
       await this.cache.set(cacheKey, result, model);
     }
 
@@ -213,7 +221,9 @@ export class AnthropicProvider implements AIProvider {
         // even when instructed otherwise. Mirrors the OpenAI provider.
         let jsonStr = raw.trim();
         if (jsonStr.startsWith('```')) {
-          jsonStr = jsonStr.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+          jsonStr = jsonStr
+            .replace(/^```(?:json)?\n?/, '')
+            .replace(/\n?```$/, '');
         }
 
         const parsed: unknown = JSON.parse(jsonStr);

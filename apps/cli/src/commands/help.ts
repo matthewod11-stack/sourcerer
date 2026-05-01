@@ -11,6 +11,8 @@ Commands:
   config        View and manage configuration
   intake        Run the intake conversation
   run           Execute a full pipeline run
+  replay        Re-score a saved run without discovery/enrichment
+  eval          Run golden-set scoring evaluation
   discover      Run discovery phase only
   enrich        Run enrichment phase only
   score         Run scoring phase only

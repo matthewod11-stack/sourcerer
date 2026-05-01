@@ -47,6 +47,9 @@ importers:
       '@sourcerer/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@sourcerer/eval':
+        specifier: workspace:*
+        version: link:../../packages/eval
       '@sourcerer/intake':
         specifier: workspace:*
         version: link:../../packages/intake
@@ -138,6 +141,18 @@ importers:
       zod:
         specifier: ^3.24.0
         version: 3.25.76
+
+  packages/eval:
+    dependencies:
+      '@sourcerer/ai':
+        specifier: workspace:*
+        version: link:../ai
+      '@sourcerer/core':
+        specifier: workspace:*
+        version: link:../core
+      '@sourcerer/scoring':
+        specifier: workspace:*
+        version: link:../scoring
 
   packages/intake:
     dependencies:

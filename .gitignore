@@ -33,6 +33,7 @@ coverage/
 
 # Run artifacts (candidate data, PII)
 runs/
+eval-results/
 
 # Cache
 .cache/

@@ -1,0 +1,71 @@
+name: Golden Eval
+
+on:
+  schedule:
+    - cron: "0 15 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  golden-eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm eval
+
+      - name: Open issue on accuracy regression
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const dir = 'eval-results';
+          const latest = fs.readdirSync(dir)
+            .filter((file) => file.endsWith('.json'))
+            .sort()
+            .at(-1);
+          if (!latest) throw new Error('No eval report generated');
+          const report = JSON.parse(fs.readFileSync(path.join(dir, latest), 'utf8'));
+          const accuracy = report.metrics.exactTierAccuracy;
+          const threshold = 0.95;
+          if (accuracy >= threshold) process.exit(0);
+          fs.writeFileSync(
+            'eval-regression.md',
+            [
+              'Golden-set eval accuracy dropped below the 95% threshold.',
+              '',
+              `Report: ${latest}`,
+              `Accuracy: ${(accuracy * 100).toFixed(1)}%`,
+              `Candidates: ${report.metrics.candidateCount}`,
+              `Hallucination rate: ${(report.metrics.hallucinationRate * 100).toFixed(1)}%`,
+              `Cost: $${report.metrics.totalCostUsd.toFixed(4)}`,
+              '',
+              'Review the generated eval report in the workflow artifacts/logs and compare against the previous weekly run.',
+            ].join('\n'),
+          );
+          NODE
+
+      - name: Create regression issue
+        if: ${{ hashFiles('eval-regression.md') != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --title "Golden eval accuracy regression" \
+            --body-file eval-regression.md \
+            --label "tech-debt"

@@ -103,6 +103,22 @@ pnpm --filter @sourcerer/cli start run --config search-config.yaml --output json
 
 # View results
 pnpm --filter @sourcerer/cli start results --tier 1
+
+# Re-score a saved run without re-fetching candidates
+pnpm --filter @sourcerer/cli start replay <run-id-or-dir>
+
+# Run the mock golden-set scoring eval
+pnpm eval
+```
+
+### Prompt Iteration
+
+Use `sourcerer replay <run-id-or-dir>` when you want to iterate on scoring prompts without spending discovery or enrichment quota again. Replay loads the source run's saved `candidates.json`, re-runs only the scoring phase with the current prompts, and writes the result to a new run directory so the original run stays intact.
+
+The AI response cache is still honored during replay. To intentionally bust only the scoring cache while testing a prompt variant, pass a namespace:
+
+```bash
+sourcerer replay <run-id-or-dir> --prompt-version v3
 ```
 
 ### Required API Keys

@@ -7,6 +7,7 @@ import { ResponseCache } from './response-cache.js';
 
 export interface CreateAIProviderOptions {
   noCache?: boolean;
+  cacheNamespace?: string;
 }
 
 /**
@@ -23,7 +24,7 @@ export function createAIProvider(
   const { name, apiKey, model } = config.aiProvider;
   const cache = options?.noCache
     ? undefined
-    : new ResponseCache({ enabled: true });
+    : new ResponseCache({ enabled: true, namespace: options?.cacheNamespace });
 
   switch (name) {
     case 'anthropic':

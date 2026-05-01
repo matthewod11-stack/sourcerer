@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "turbo build",
+    "eval": "pnpm --filter @sourcerer/cli build && node apps/cli/dist/index.js eval --mock",
     "test": "turbo test",
     "lint": "turbo lint",
     "dev": "turbo dev",

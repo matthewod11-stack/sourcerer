@@ -1,0 +1,26 @@
+import { describe, expect, it } from 'vitest';
+import {
+  GOLDEN_SET,
+  createGoldenFixtureProvider,
+  runGoldenEvaluation,
+} from '../index.js';
+
+describe('golden eval runner', () => {
+  it('ships at least 15 golden fixtures', () => {
+    expect(GOLDEN_SET.candidates.length).toBeGreaterThanOrEqual(15);
+  });
+
+  it('computes perfect metrics with the deterministic fixture provider', async () => {
+    const report = await runGoldenEvaluation({
+      provider: createGoldenFixtureProvider,
+      modelLabel: 'fixture',
+    });
+
+    expect(report.metrics.candidateCount).toBe(GOLDEN_SET.candidates.length);
+    expect(report.metrics.exactTierAccuracy).toBe(1);
+    expect(report.metrics.tierProximityAccuracy).toBe(1);
+    expect(report.metrics.hallucinationRate).toBe(0);
+    expect(report.metrics.totalCostUsd).toBe(0);
+    expect(report.metrics.meanAbsoluteErrorByDimension.technicalDepth).toBe(0);
+  });
+});
