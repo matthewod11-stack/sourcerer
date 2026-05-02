@@ -1,7 +1,7 @@
 # Sourcerer — Roadmap
 
 > **Last updated:** 2026-05-01
-> **Active workstream:** Hardening Phase 6 (Phases 1–5 ✅ complete; H-1 follow-up #18 closed — see [`docs/hardening-roadmap-2026-04-16.md`](docs/hardening-roadmap-2026-04-16.md))
+> **Active workstream:** Hardening pass ✅ complete through Phase 6 (see [`docs/hardening-roadmap-2026-04-16.md`](docs/hardening-roadmap-2026-04-16.md))
 > **Paused workstream:** V1 product backlog — Phase 7.2 / 7.5 / 7.6 / 7.7 (see [`docs/roadmap.md`](docs/roadmap.md))
 
 This file is the single source of truth for `/session-start` task selection. Phased lists are ordered by dependency. The first unchecked `[ ]` item is the next task.
@@ -48,9 +48,9 @@ Full item specs (Problem, Fix, Files, Acceptance, Effort) live in [`docs/hardeni
 - [x] **E-3** Cache-driven replay mode — S–M — needs E-4 ✅ 2026-05-01
 - [x] **E-1** Golden-set evaluation harness — L — needs E-2 ✅ 2026-05-01
 
-### Phase 6 — Batch-scoring spike
+### Phase 6 — Batch-scoring spike ✅ COMPLETE 2026-05-01
 
-- [ ] **E-5** Opus-4.7 / 1M-context batch scoring spike — M + L — needs-design-decision — needs E-1
+- [x] **E-5** Opus-4.7 / 1M-context batch scoring spike — M + L — recommendation: continue as experimental, do not make default without live-run lift ✅ 2026-05-01
 
 **Minimum-viable hardening pass:** Phase 1 + H-5 + H-7. Closes every High-severity finding plus the most important Medium in 2–3 sessions.
 

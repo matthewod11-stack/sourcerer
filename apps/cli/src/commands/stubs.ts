@@ -3,7 +3,6 @@
 const STUB_COMMANDS = [
   'discover',
   'enrich',
-  'score',
 ] as const;
 
 export type StubCommand = (typeof STUB_COMMANDS)[number];

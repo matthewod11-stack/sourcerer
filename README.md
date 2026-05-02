@@ -109,6 +109,9 @@ pnpm --filter @sourcerer/cli start replay <run-id-or-dir>
 
 # Run the mock golden-set scoring eval
 pnpm eval
+
+# Run the Phase 6 mock batch-scoring comparison
+pnpm --filter @sourcerer/cli start score --batch --mock
 ```
 
 ### Prompt Iteration
@@ -120,6 +123,17 @@ The AI response cache is still honored during replay. To intentionally bust only
 ```bash
 sourcerer replay <run-id-or-dir> --prompt-version v3
 ```
+
+### Batch Scoring Spike
+
+Phase 6 adds an experimental golden-set comparison path for 1M-context batch scoring:
+
+```bash
+sourcerer score --batch --mock
+sourcerer score --batch --model claude-opus-4-7
+```
+
+The command compares the existing per-candidate scoring baseline against a single-call batch scoring prompt and writes JSON/Markdown reports under `eval-results/`. Use `--mock` for no-key/no-cost smoke checks; omit it only when intentionally spending provider quota.
 
 ### Required API Keys
 

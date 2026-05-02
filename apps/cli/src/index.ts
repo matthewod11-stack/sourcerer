@@ -96,6 +96,13 @@ async function main(): Promise<void> {
     return;
   }
 
+  // Score command
+  if (command === 'score') {
+    const { scoreCommand } = await import('./commands/score.js');
+    await scoreCommand(args.slice(1));
+    return;
+  }
+
   // Candidates command
   if (command === 'candidates') {
     const { candidatesCommand } = await import('./commands/candidates.js');

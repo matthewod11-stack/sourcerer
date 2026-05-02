@@ -2,7 +2,7 @@
 
 > **Created:** 2026-04-16
 > **Source:** Mini audit run on Opus 4.7 (1M context) against the post-Phase-7.4 codebase
-> **Status:** Active — Phase 6, E-5 next
+> **Status:** Complete through Phase 6
 > **Scope:** Security, privacy, correctness, and high-leverage enhancements that are _not_ in `docs/roadmap.md`
 
 This document captures findings from a full-repo audit and converts each into a discrete, actionable work item. It is designed to be picked up in any order (respecting the dependency graph at the bottom) and referenced over multiple sessions.
@@ -47,9 +47,9 @@ The root [`ROADMAP.md`](../ROADMAP.md) is the authoritative ordering. The checkl
 - [x] **E-3** Cache-driven replay mode (S–M, needs E-4) ✅ 2026-05-01
 - [x] **E-1** Golden-set evaluation harness (L, needs E-2) ✅ 2026-05-01
 
-### Phase 6 — Batch-scoring spike
+### Phase 6 — Batch-scoring spike ✅ COMPLETE 2026-05-01
 
-- [ ] **E-5** Opus-4.7 / 1M-context batch scoring spike (M + L, needs E-1)
+- [x] **E-5** Opus-4.7 / 1M-context batch scoring spike (M + L, needs E-1) ✅ 2026-05-01
 
 **Minimum-viable hardening pass** (per the audit): Phase 1 + H-5 + H-7 — closes every High-severity finding and the most important Medium. ~2–3 sessions.
 
@@ -595,6 +595,8 @@ These are net-new features, not fixes. Ordered by leverage.
 ---
 
 ### E-5: Opus-4.7 / 1M-context batch scoring spike
+
+**Status.** Complete 2026-05-01. Spike writeup: [`docs/spikes/2026-05-01-batch-scoring-spike.md`](spikes/2026-05-01-batch-scoring-spike.md). Recommendation: keep batch scoring experimental; do not make it the default without a live Opus run showing quality lift that justifies cost and larger prompt surface.
 
 **Problem.** Current scoring is per-candidate. With 1M context, you can load the entire candidate pool (plus talent profile) into one call and let the model cross-compare — typically yielding better-calibrated relative rankings. This is a design spike, not a feature to commit to yet.
 

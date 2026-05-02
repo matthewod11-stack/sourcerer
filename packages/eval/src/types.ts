@@ -67,6 +67,29 @@ export interface GoldenEvalReport {
   name: string;
   generatedAt: string;
   modelLabel: string;
+  mode?: 'per-candidate' | 'batch';
   metrics: GoldenEvalMetrics;
   results: CandidateEvalResult[];
+  batchRanking?: BatchRankingEntry[];
+}
+
+export interface BatchRankingEntry {
+  candidateId: string;
+  rank: number;
+  rationale: string;
+}
+
+export interface GoldenEvalComparison {
+  name: string;
+  generatedAt: string;
+  modelLabel: string;
+  baseline: GoldenEvalReport;
+  batch: GoldenEvalReport;
+  deltas: {
+    exactTierAccuracy: number;
+    tierProximityAccuracy: number;
+    hallucinationRate: number;
+    totalCostUsd: number;
+    meanAbsoluteErrorByDimension: Record<ScoreDimension, number>;
+  };
 }

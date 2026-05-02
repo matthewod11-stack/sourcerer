@@ -129,7 +129,7 @@ describe('parsePromptTemplate', () => {
 });
 
 describe('listTemplates', () => {
-  it('lists all 6 templates', async () => {
+  it('lists all 7 templates', async () => {
     const templates = await listTemplates();
     expect(templates).toContain('intake-role-parse');
     expect(templates).toContain('intake-company-analyze');
@@ -137,7 +137,8 @@ describe('listTemplates', () => {
     expect(templates).toContain('intake-config-generate');
     expect(templates).toContain('scoring-signal-extract');
     expect(templates).toContain('scoring-narrative');
-    expect(templates).toHaveLength(6);
+    expect(templates).toContain('scoring-batch');
+    expect(templates).toHaveLength(7);
   });
 
   it('returns sorted names', async () => {
