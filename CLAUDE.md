@@ -37,8 +37,7 @@ sourcerer/
 └── docs/
     ├── specs/                               # Design specifications
     ├── roadmap.md                           # V1 product roadmap (phased)
-    ├── hardening-roadmap-2026-04-16.md      # Security/privacy/correctness audit backlog
-    └── OVERNIGHT_AGENT.md                   # Autonomous tech-debt agent prompt
+    └── hardening-roadmap-2026-04-16.md      # Security/privacy/correctness audit backlog
 ```
 
 ## Documentation Map
@@ -50,8 +49,7 @@ sourcerer/
 | What's the product V1 plan?                   | [`docs/roadmap.md`](docs/roadmap.md)                                                     |
 | What's the design?                            | [`docs/specs/2026-03-20-sourcerer-design.md`](docs/specs/2026-03-20-sourcerer-design.md) |
 | What happened last session?                   | [`PROGRESS.md`](PROGRESS.md)                                                             |
-| What's being tracked for the overnight agent? | `gh issue list --label tech-debt`                                                        |
-| How does the overnight agent work?            | [`docs/OVERNIGHT_AGENT.md`](docs/OVERNIGHT_AGENT.md)                                     |
+| What tech-debt is tracked?                    | `gh issue list --label tech-debt`                                                        |
 | Setting up a new machine?                     | [`Machine Setup`](#machine-setup) section below                                          |
 
 ## Key Commands
@@ -72,7 +70,7 @@ Most of what you need lands with `git clone` + `pnpm install`. A few things are 
 
 ### What `git clone` gives you
 
-All source, tests, prompts, docs, the overnight agent prompt, and the hardening roadmap. After `pnpm install && pnpm build && pnpm test` you have a working, tested codebase.
+All source, tests, prompts, docs, and the hardening roadmap. After `pnpm install && pnpm build && pnpm test` you have a working, tested codebase.
 
 ### What's per-machine (gitignored)
 
@@ -81,7 +79,7 @@ All source, tests, prompts, docs, the overnight agent prompt, and the hardening 
 | `~/.sourcerer/config.yaml`                                                                           | API keys (Anthropic, Exa, GitHub, Hunter, Notion)                          | **Copy from another machine** (`scp`/`rsync`), or run `pnpm --filter @sourcerer/cli start init` and paste keys interactively |
 | `.env` / `.env.local`                                                                                | Optional shell-env overrides for development                               | Copy if you have a working setup; otherwise unneeded                                                                         |
 | `runs/` (repo root)                                                                                  | Cached candidate data from past sourcing runs (contains PII)               | **Don't sync.** Recreate per machine — running another sourcing pass is cheaper than transferring PII across machines        |
-| `state/` (repo root)                                                                                 | Overnight-agent run log + other runtime state                              | Auto-created on first overnight-agent run; don't sync                                                                        |
+| `state/` (repo root)                                                                                 | Runtime state (gitignored)                                                 | Auto-created at runtime; don't sync                                                                                          |
 | `PROGRESS.md`                                                                                        | Per-machine session history written by `/session-start` and `/session-end` | **Don't sync.** Each machine keeps its own — divergent histories will confuse you                                            |
 | `AGENTS.md`, `PROJECT_STATE.md`, `prompts/`, `DESIGN-sourcerer-strategy-*.md`, `PROGRESS_ARCHIVE.md` | Personal/workflow files kept out of the public OSS repo                    | Copy if you have them on another machine; otherwise the project still runs without them                                      |
 
@@ -122,7 +120,6 @@ At-rest encryption is an explicit non-goal for the current local-dev posture. Do
 - [`docs/specs/2026-03-20-sourcerer-design.md`](docs/specs/2026-03-20-sourcerer-design.md) — Full design specification (reviewed, 2 rounds)
 - [`docs/roadmap.md`](docs/roadmap.md) — V1 product roadmap (phases 1–7, validated)
 - [`docs/hardening-roadmap-2026-04-16.md`](docs/hardening-roadmap-2026-04-16.md) — Security/privacy/quality audit backlog (active workstream)
-- [`docs/OVERNIGHT_AGENT.md`](docs/OVERNIGHT_AGENT.md) — Autonomous tech-debt agent prompt + issue template
 
 ## Conventions
 
