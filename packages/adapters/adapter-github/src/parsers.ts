@@ -46,7 +46,10 @@ export function extractEmailsFromCommits(commits: GitHubCommit[]): string[] {
       const aPersonal = isPersonalEmail(a[0]) ? 0 : 1;
       const bPersonal = isPersonalEmail(b[0]) ? 0 : 1;
       if (aPersonal !== bPersonal) return aPersonal - bPersonal;
-      return b[1] - a[1]; // higher frequency first
+      if (b[1] !== a[1]) return b[1] - a[1]; // higher frequency first
+      // Deterministic tiebreaker: equal-class, equal-frequency emails sort by
+      // string so the canonical email can't flip with commit API order (#19).
+      return a[0].localeCompare(b[0]);
     })
     .map(([email]) => email);
 }

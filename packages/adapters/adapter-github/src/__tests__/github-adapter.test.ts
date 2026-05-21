@@ -403,6 +403,52 @@ describe('selectTopRepos (H-10 stable sort)', () => {
   });
 });
 
+describe('extractEmailsFromCommits (H-10 follow-up: stable tiebreaker)', () => {
+  // LCG-based shuffle so test outcome is reproducible (mirrors the H-10 test).
+  function deterministicShuffle<T>(arr: readonly T[], seed: number): T[] {
+    const a = [...arr];
+    let s = seed >>> 0;
+    for (let i = a.length - 1; i > 0; i--) {
+      s = (s * 1103515245 + 12345) >>> 0;
+      const j = s % (i + 1);
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function makeCommit(email: string): GitHubCommit {
+    return {
+      sha: `sha-${email}`,
+      commit: {
+        author: { name: 'Dev', email, date: '2026-01-01T00:00:00Z' },
+        message: 'commit',
+      },
+      html_url: 'https://github.com/u/r/commit/sha',
+    };
+  }
+
+  it('produces identical top-1 canonical email across 100 shuffles when frequency ties', () => {
+    // Both emails are personal (gmail) and tie at frequency 2. Without a string
+    // tiebreaker, the commit API response order decides which becomes the
+    // canonical email used in identity resolution — flipping canonicalId across runs.
+    const commits: GitHubCommit[] = [
+      makeCommit('zoe@gmail.com'),
+      makeCommit('zoe@gmail.com'),
+      makeCommit('amy@gmail.com'),
+      makeCommit('amy@gmail.com'),
+    ];
+
+    const expected = extractEmailsFromCommits(commits);
+    // localeCompare ascending → 'amy' sorts before 'zoe' deterministically.
+    expect(expected[0]).toBe('amy@gmail.com');
+
+    for (let seed = 1; seed <= 100; seed++) {
+      const shuffled = deterministicShuffle(commits, seed);
+      expect(extractEmailsFromCommits(shuffled)[0]).toBe(expected[0]);
+    }
+  });
+});
+
 describe('GitHubClient API contract validation (H-11)', () => {
   it('throws ApiContractError with the missing field path', async () => {
     mockFetch.mockImplementation(async () => ({
