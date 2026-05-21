@@ -73,6 +73,7 @@ export class GitHubAdapter implements DataSource {
     this.retentionTtlDays = retentionTtlDays;
   }
 
+  // eslint-disable-next-line require-yield -- enrichment-only adapter; throws to satisfy the AsyncGenerator interface contract
   async *search(_config: SearchConfig): AsyncGenerator<SearchPage> {
     throw new Error(
       'GitHubAdapter is enrichment-only. Use enrich() or enrichBatch() instead.',

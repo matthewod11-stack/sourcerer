@@ -1,6 +1,5 @@
 // Pipeline types — adapter interfaces, search config, and orchestration primitives
 
-import type { EvidenceItem } from './evidence.js';
 import type {
   Candidate,
   RawCandidate,

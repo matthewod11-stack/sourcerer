@@ -12,7 +12,6 @@ import type {
   PhaseOutputMap,
   RunMeta,
   PhaseTimingEntry,
-  ProgressEvent,
   Checkpoint,
   DiscoverPhaseOutput,
   DedupPhaseOutput,

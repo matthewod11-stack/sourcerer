@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type {
@@ -10,7 +10,6 @@ import type {
   StructuredOutputOptions,
   StructuredOutputResult,
   TokenUsage,
-  IntakeContext,
 } from '@sourcerer/core';
 
 const ZERO_USAGE: TokenUsage = {
@@ -32,10 +31,7 @@ import {
 // --- Mock AIProvider ---
 
 function createMockAIProvider(): AIProvider {
-  let callCount = 0;
-
   function pickStructuredData<T>(messages: Message[]): T {
-    callCount++;
     const systemMsg = messages[0]?.content ?? '';
 
     // Route based on what the system prompt asks for

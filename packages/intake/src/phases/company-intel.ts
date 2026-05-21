@@ -91,7 +91,7 @@ export function createCompanyIntelNodes(
 
           // We encode the intel as a JSON prefix so the parse function can extract it
           return `__INTEL__${JSON.stringify(intel)}__INTEL__\n${lines.join('\n')}`;
-        } catch (error) {
+        } catch {
           return `I had trouble analyzing that URL. Could you tell me about the company instead? (Name, what they build, tech stack, team size)`;
         }
       },

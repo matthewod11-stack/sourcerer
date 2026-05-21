@@ -5,7 +5,6 @@ import chalk from 'chalk';
 import {
   CONFIG_PATH,
   validateConfig,
-  type SourcererConfig,
   type AIProviderName,
   type AdapterKeyConfig,
 } from '@sourcerer/core';

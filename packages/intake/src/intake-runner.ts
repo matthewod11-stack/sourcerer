@@ -12,9 +12,7 @@ import {
   ConversationEngine,
   buildGraph,
   restoreConversation,
-  TERMINAL_NODE,
   type ConversationGraph,
-  type ConversationState,
 } from './conversation-engine.js';
 import { createIntakeContext } from './intake-context.js';
 import { createRoleContextNodes } from './phases/role-context.js';

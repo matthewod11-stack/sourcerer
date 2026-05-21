@@ -81,7 +81,7 @@ export function normalizeLinkedInUrl(url: string): string {
 }
 
 export function normalizeEmail(email: string): string {
-  let n = email.toLowerCase().trim();
+  const n = email.toLowerCase().trim();
   const atIndex = n.indexOf('@');
   if (atIndex === -1) return n;
   let local = n.slice(0, atIndex);

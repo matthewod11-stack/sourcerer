@@ -117,6 +117,7 @@ export async function loadCheckpoint(
   } catch (err) {
     throw new Error(
       `Invalid checkpoint JSON at ${path}: ${err instanceof Error ? err.message : String(err)}`,
+      { cause: err },
     );
   }
 

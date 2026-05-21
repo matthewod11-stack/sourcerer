@@ -8,8 +8,6 @@ import type {
   AIProvider,
 } from '@sourcerer/core';
 
-import { TERMINAL_NODE } from '../conversation-engine.js';
-import { hasRoleData } from '../intake-context.js';
 import { RoleParametersSchema } from '../schemas.js';
 
 /**

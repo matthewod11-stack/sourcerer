@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { ProfileAnalysis, CrawledContent, CompanyIntel } from '@sourcerer/core';
+import type { ProfileAnalysis, CrawledContent } from '@sourcerer/core';
 import { ContentResearchEngine, extractSimilaritySeeds } from '../content-research.js';
 import {
   createMockAIProvider,

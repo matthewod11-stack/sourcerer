@@ -5,13 +5,10 @@ import {
   restoreIntakeEngine,
   extractIntakeResult,
 } from '../intake-runner.js';
-import { TERMINAL_NODE } from '../conversation-engine.js';
 import {
   createMockAIProvider,
   createMockContentResearch,
   makeRoleParameters,
-  makeCompanyIntel,
-  makeProfileAnalysis,
   makeCompetitorMap,
   makeFullIntakeContext,
 } from './helpers.js';

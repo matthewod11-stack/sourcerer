@@ -7,7 +7,6 @@ import {
   unlink,
   readdir,
   mkdir,
-  rm,
 } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';

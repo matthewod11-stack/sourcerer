@@ -13,8 +13,6 @@ import {
   type DiscoverPhaseOutput,
   type DedupPhaseOutput,
   type EnrichPhaseOutput,
-  type ScorePhaseOutput,
-  type OutputPhaseOutput,
   type RawCandidate,
   type Candidate,
   type PipelineContext,
@@ -22,7 +20,6 @@ import {
   type BatchResult,
   type EnrichmentResult,
   type CostEstimate,
-  type RateLimitConfig,
   type AIProvider,
   type ExtractedSignals,
 } from '@sourcerer/core';
@@ -456,6 +453,7 @@ function makeMockAdapter(
     name,
     capabilities: ['enrichment'],
     rateLimits: { requestsPerSecond: 10 },
+    // eslint-disable-next-line require-yield -- test stub; enrichment-only mock satisfies the AsyncGenerator signature
     async *search() {
       throw new Error(`${name} is enrichment-only`);
     },

@@ -11,7 +11,6 @@ import type {
   ContentResearch,
 } from '@sourcerer/core';
 
-import { hasTeamProfiles } from '../intake-context.js';
 import { extractSimilaritySeeds } from '../content-research.js';
 import { CompositeProfileSchema, AntiPatternsSchema } from '../schemas.js';
 

@@ -12,10 +12,6 @@ import type {
   AntiFilter,
   TalentProfile,
   AIProvider,
-  RoleParameters,
-  CompanyIntel,
-  CompetitorMap,
-  CareerStep,
 } from '@sourcerer/core';
 
 import { TERMINAL_NODE } from '../conversation-engine.js';

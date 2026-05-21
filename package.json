@@ -17,10 +17,16 @@
     "clean": "turbo clean"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.15.0",
+    "eslint": "^10.4.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-unused-imports": "^4.4.1",
+    "globals": "^17.6.0",
     "prettier": "^3.5.3",
     "turbo": "^2.8.20",
     "typescript": "^5.8.3",
+    "typescript-eslint": "^8.59.4",
     "vitest": "^3.2.1"
   }
 }

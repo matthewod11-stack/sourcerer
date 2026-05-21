@@ -5,7 +5,6 @@ import { dirname } from 'node:path';
 import yaml from 'js-yaml';
 import {
   CONFIG_PATH,
-  CONFIG_DIR,
   validateConfig,
   type SourcererConfig,
 } from '@sourcerer/core';

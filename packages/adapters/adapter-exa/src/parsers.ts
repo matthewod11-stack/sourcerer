@@ -8,7 +8,6 @@ import {
   type EvidenceItem,
   type PIIField,
   type SourceData,
-  type ConfidenceLevel,
 } from '@sourcerer/core';
 
 // --- Identifier Extraction ---

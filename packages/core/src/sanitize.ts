@@ -35,6 +35,7 @@ export function sanitizeUntrustedText(text: string, options?: SanitizeOptions): 
   const maxLength = options?.maxLength ?? DEFAULT_MAX_LENGTH;
 
   // 1. Strip C0 control chars (except \t \n \r) and DEL.
+  // eslint-disable-next-line no-control-regex -- intentionally matches control chars to strip them from untrusted text (H-1)
   let result = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 
   // 2. Strip zero-width and bidi marks: ZWSP, ZWNJ, ZWJ, LRM, RLM, WJ, BOM.

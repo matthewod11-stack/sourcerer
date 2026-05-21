@@ -2,18 +2,13 @@
 
 import type {
   ConversationNode,
-  ConversationPhase,
   IntakeContext,
   ParsedResponse,
-  AIProvider,
-  Message,
 } from '@sourcerer/core';
 
 import {
   mergeContextUpdates,
   appendMessage,
-  serializeContext,
-  deserializeContext,
 } from './intake-context.js';
 
 // --- Conversation Graph ---

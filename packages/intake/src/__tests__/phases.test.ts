@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { ConversationNode, ParsedResponse, IntakeContext, RoleParameters } from '@sourcerer/core';
+import type { ParsedResponse } from '@sourcerer/core';
 import { createRoleContextNodes } from '../phases/role-context.js';
 import { createCompanyIntelNodes } from '../phases/company-intel.js';
 import { createSuccessProfileNodes, parseProfileInputs, buildCompositeProfile } from '../phases/success-profile.js';
@@ -21,7 +21,6 @@ import {
   makeIntakeContext,
   makeFullIntakeContext,
 } from './helpers.js';
-import { TERMINAL_NODE } from '../conversation-engine.js';
 
 // --- Phase 1: Role Context ---
 

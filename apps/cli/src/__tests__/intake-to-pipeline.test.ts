@@ -5,9 +5,7 @@ import { tmpdir } from 'node:os';
 import type {
   AIProvider,
   Message,
-  ChatOptions,
   ChatResult,
-  StructuredOutputOptions,
   StructuredOutputResult,
   TokenUsage,
   RawCandidate,

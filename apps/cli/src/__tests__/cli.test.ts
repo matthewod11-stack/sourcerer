@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { configFileExists, loadConfigFromDisk, saveConfigToDisk } from '../config-io.js';
-import { showHelp, showVersion, showUnknownCommand } from '../commands/help.js';
+import { showHelp, showVersion } from '../commands/help.js';
 import { isStubCommand, runStub } from '../commands/stubs.js';
 import { configStatus } from '../commands/config-status.js';
 import type { SourcererConfig } from '@sourcerer/core';

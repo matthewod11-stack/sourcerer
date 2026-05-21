@@ -12,7 +12,6 @@ import {
 import type {
   Candidate,
   ObservedIdentifier,
-  EnrichmentResult,
 } from '@sourcerer/core';
 import {
   GitHubClient,
@@ -706,9 +705,7 @@ describe('GitHubAdapter', () => {
         makeCandidate('sarahchen', `candidate-${i}`),
       );
 
-      const start = Date.now();
       const result = await adapter.enrichBatch(candidates);
-      const elapsed = Date.now() - start;
 
       expect(result.succeeded).toHaveLength(20);
       expect(result.failed).toHaveLength(0);
@@ -847,7 +844,6 @@ describe('GitHubAdapter', () => {
     });
 
     it('handles partial failures with various errors', async () => {
-      let candidateIndex = 0;
       mockFetch.mockImplementation(async (url: string) => {
         const path = new URL(url).pathname;
 

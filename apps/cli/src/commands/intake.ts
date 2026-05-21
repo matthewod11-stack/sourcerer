@@ -5,7 +5,6 @@ import { join, dirname } from 'node:path';
 import chalk from 'chalk';
 import { input } from '@inquirer/prompts';
 import yaml from 'js-yaml';
-import type { SourcererConfig } from '@sourcerer/core';
 import { createAIProvider } from '@sourcerer/ai';
 import { ExaAdapter } from '@sourcerer/adapter-exa';
 import { GitHubAdapter } from '@sourcerer/adapter-github';

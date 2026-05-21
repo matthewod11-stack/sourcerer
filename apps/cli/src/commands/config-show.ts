@@ -20,7 +20,7 @@ export async function configShow(): Promise<void> {
     // Redact API keys for display
     const display = JSON.parse(JSON.stringify(config));
     if (display.adapters) {
-      for (const [name, adapter] of Object.entries(display.adapters)) {
+      for (const adapter of Object.values(display.adapters)) {
         if (adapter && typeof adapter === 'object' && 'apiKey' in adapter) {
           (adapter as Record<string, unknown>).apiKey = '***redacted***';
         }

@@ -41,6 +41,7 @@ export class XAdapter implements DataSource {
       (this.rateLimits.requestsPerMinute ?? this.client.requestsPerMinute);
   }
 
+  // eslint-disable-next-line require-yield -- enrichment-only adapter; throws to satisfy the AsyncGenerator interface contract
   async *search(_config: SearchConfig): AsyncGenerator<SearchPage> {
     throw new Error(
       'XAdapter is enrichment-only. Use enrich() or enrichBatch() instead.',
@@ -150,7 +151,6 @@ export class XAdapter implements DataSource {
       }
     } else {
       // Semaphore-based concurrency for pro/enterprise
-      let running = 0;
       const queue = [...candidates];
 
       const processNext = async (): Promise<void> => {

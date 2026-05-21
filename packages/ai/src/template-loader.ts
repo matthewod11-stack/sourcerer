@@ -75,6 +75,7 @@ export async function loadTemplate(name: string): Promise<PromptTemplate> {
     if (code === 'ENOENT') {
       throw new Error(
         `Prompt template not found: ${name} (looked at ${filePath})`,
+        { cause: err },
       );
     }
     throw err;

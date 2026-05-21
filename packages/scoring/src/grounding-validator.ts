@@ -15,14 +15,6 @@ export interface GroundingResult {
   violations: GroundingViolation[];
 }
 
-const DIMENSION_NAMES = [
-  'technicalDepth',
-  'domainRelevance',
-  'trajectoryMatch',
-  'cultureFit',
-  'reachability',
-] as const;
-
 /**
  * Per-hallucination floor: every fabricated citation reduces the dimension's
  * score by at least this fraction (15% by default), regardless of how many

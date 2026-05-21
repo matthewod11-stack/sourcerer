@@ -3,11 +3,6 @@
 import { z } from 'zod';
 import type {
   IntakeContext,
-  CompanyIntel,
-  ProfileAnalysis,
-  RoleParameters,
-  CompetitorMap,
-  TalentProfile,
   Message,
 } from '@sourcerer/core';
 import { IntakeContextSchema } from './schemas.js';
@@ -109,6 +104,7 @@ export function deserializeContext(json: string): IntakeContext {
   } catch (err) {
     throw new Error(
       `Invalid IntakeContext JSON: ${err instanceof Error ? err.message : String(err)}`,
+      { cause: err },
     );
   }
 

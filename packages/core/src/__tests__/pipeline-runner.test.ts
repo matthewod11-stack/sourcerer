@@ -18,15 +18,11 @@ import {
 } from '../checkpoint.js';
 import type {
   PipelineHandlers,
-  PipelineRunConfig,
   PipelineContext,
-  PhaseResult,
   IntakePhaseOutput,
   DiscoverPhaseOutput,
   DedupPhaseOutput,
   EnrichPhaseOutput,
-  ScorePhaseOutput,
-  OutputPhaseOutput,
   RunMeta,
   ProgressEvent,
 } from '../pipeline-types.js';

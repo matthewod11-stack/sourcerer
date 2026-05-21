@@ -1,7 +1,7 @@
 // Pipeline runner types — phases, handlers, context, run metadata, checkpoints
 
 import type { RawCandidate, Candidate, ScoredCandidate } from './candidate.js';
-import type { SearchConfig, OutputConfig, CostEstimate } from './pipeline.js';
+import type { SearchConfig, OutputConfig } from './pipeline.js';
 import type { TalentProfile } from './intake.js';
 import type { ResolveResult } from './identity-resolver.js';
 import type { SourcererLogger } from './logger.js';

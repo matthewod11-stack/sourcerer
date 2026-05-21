@@ -218,17 +218,6 @@ function makeCandidate(handle?: string): Candidate {
   };
 }
 
-const searchConfig = {
-  roleName: 'Test',
-  tiers: [],
-  scoringWeights: {},
-  tierThresholds: { tier1MinScore: 70, tier2MinScore: 40 },
-  enrichmentPriority: [],
-  antiFilters: [],
-  createdAt: '2026-03-23T00:00:00Z',
-  version: 1,
-};
-
 // --- Tests ---
 
 describe('XAdapter', () => {
