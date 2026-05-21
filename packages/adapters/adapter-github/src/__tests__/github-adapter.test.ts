@@ -449,6 +449,63 @@ describe('extractEmailsFromCommits (H-10 follow-up: stable tiebreaker)', () => {
   });
 });
 
+describe('computeLanguageDistribution (H-10 follow-up: stable tiebreaker, #23)', () => {
+  // LCG-based shuffle so test outcome is reproducible (mirrors the H-10 test).
+  function deterministicShuffle<T>(arr: readonly T[], seed: number): T[] {
+    const a = [...arr];
+    let s = seed >>> 0;
+    for (let i = a.length - 1; i > 0; i--) {
+      s = (s * 1103515245 + 12345) >>> 0;
+      const j = s % (i + 1);
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function makeLangRepo(language: string) {
+    return {
+      name: `r-${language}`,
+      stargazers_count: 0,
+      fork: false,
+      full_name: `u/r-${language}`,
+      language,
+      forks_count: 0,
+      topics: [],
+      updated_at: '2026-01-01T00:00:00Z',
+      pushed_at: '2026-01-01T00:00:00Z',
+      html_url: 'https://github.com/u/r',
+    };
+  }
+
+  it('produces identical top-5 languages across 100 shuffles when counts tie at the boundary', () => {
+    // Java and Ruby tie at count 1, straddling the top-5 cutoff. Ruby is listed
+    // first so that without a tiebreaker the unshuffled order would (wrongly)
+    // pick Ruby; the repo API response order would then flip it run to run.
+    const repos = [
+      ...Array.from({ length: 5 }, () => makeLangRepo('TypeScript')),
+      ...Array.from({ length: 4 }, () => makeLangRepo('Python')),
+      ...Array.from({ length: 3 }, () => makeLangRepo('Go')),
+      ...Array.from({ length: 2 }, () => makeLangRepo('Rust')),
+      makeLangRepo('Ruby'),
+      makeLangRepo('Java'),
+    ];
+
+    const expected = computeLanguageDistribution(repos as GitHubRepo[]).map(
+      (s) => s.language,
+    );
+    // localeCompare ascending → 'Java' beats 'Ruby' for the 5th slot.
+    expect(expected).toEqual(['TypeScript', 'Python', 'Go', 'Rust', 'Java']);
+
+    for (let seed = 1; seed <= 100; seed++) {
+      const shuffled = deterministicShuffle(repos, seed);
+      const result = computeLanguageDistribution(shuffled as GitHubRepo[]).map(
+        (s) => s.language,
+      );
+      expect(result).toEqual(expected);
+    }
+  });
+});
+
 describe('GitHubClient API contract validation (H-11)', () => {
   it('throws ApiContractError with the missing field path', async () => {
     mockFetch.mockImplementation(async () => ({

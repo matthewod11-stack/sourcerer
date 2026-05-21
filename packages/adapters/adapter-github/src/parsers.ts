@@ -84,7 +84,12 @@ export function computeLanguageDistribution(
   }
 
   return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
+    .sort((a, b) => {
+      if (b[1] !== a[1]) return b[1] - a[1]; // higher count first
+      // Deterministic tiebreaker before the top-5 cutoff so equal-count
+      // languages can't flip in/out of the profile with repo API order (#23).
+      return a[0].localeCompare(b[0]);
+    })
     .slice(0, 5)
     .map(([language, count]) => ({
       language,
