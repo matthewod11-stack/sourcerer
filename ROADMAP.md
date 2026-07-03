@@ -35,6 +35,7 @@ Full item specs (Problem, Fix, Files, Acceptance, Effort) live in [`docs/hardeni
 ### Phase 1 follow-up
 
 - [x] [**H-1 follow-up** #18](https://github.com/matthewod11-stack/sourcerer/issues/18) Run behavioral adversarial eval with real LLM — narrative paraphrase directive — ✅ 2026-04-30 (5/5 defended)
+- [ ] [**At-rest artifact encryption** #21](https://github.com/matthewod11-stack/sourcerer/issues/21) Optional encryption for PII-bearing run artifacts — design drafted in [`docs/security/run-artifact-encryption-design.md`](docs/security/run-artifact-encryption-design.md)
 
 ### Phase 4 — Logging, prompt versioning, tests, docs ✅ COMPLETE 2026-05-01
 
