@@ -4,8 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { configFileExists, loadConfigFromDisk, saveConfigToDisk } from '../config-io.js';
-import { showHelp, showVersion } from '../commands/help.js';
-import { isStubCommand, runStub } from '../commands/stubs.js';
+import { showHelp, showUnknownCommand, showVersion } from '../commands/help.js';
 import { configStatus } from '../commands/config-status.js';
 import type { SourcererConfig } from '@sourcerer/core';
 
@@ -114,6 +113,8 @@ describe('Help command', () => {
     expect(output).toContain('run');
     expect(output).toContain('intake');
     expect(output).toContain('results');
+    expect(output).not.toContain('discover      Run discovery phase only');
+    expect(output).not.toContain('enrich        Run enrichment phase only');
   });
 
   it('showVersion outputs version', () => {
@@ -126,23 +127,21 @@ describe('Help command', () => {
   });
 });
 
-describe('Stub commands', () => {
-  it('isStubCommand recognizes valid commands', () => {
-    expect(isStubCommand('discover')).toBe(true);
-  });
+describe('Unknown commands', () => {
+  it('reports unimplemented phase commands as unknown instead of public stubs', () => {
+    const errors: string[] = [];
+    const originalError = console.error;
+    const originalExitCode = process.exitCode;
+    console.error = (...args: unknown[]) => errors.push(args.join(' '));
 
-  it('isStubCommand rejects unknown commands', () => {
-    expect(isStubCommand('unknown')).toBe(false);
-    expect(isStubCommand('config')).toBe(false);
-  });
+    showUnknownCommand('discover');
 
-  it('runStub prints not yet implemented', () => {
-    const log: string[] = [];
-    const orig = console.log;
-    console.log = (...args: unknown[]) => log.push(args.join(' '));
-    runStub('run');
-    console.log = orig;
-    expect(log[0]).toContain('not yet implemented');
+    console.error = originalError;
+    process.exitCode = originalExitCode;
+
+    const output = errors.join('\n');
+    expect(output).toContain('Unknown command: discover');
+    expect(output).toContain('Run sourcerer --help');
   });
 });
 

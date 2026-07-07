@@ -1,4 +1,4 @@
-// Run from packages/eval: pnpm vitest run dump-rust-reference
+// Set SOURCERER_DUMP_RUST_REFERENCE=1 to refresh tmp/golden-ts-reference.json.
 import { describe, it, expect } from 'vitest';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
@@ -105,8 +105,10 @@ describe('dump-rust-reference', () => {
       adversarial,
     };
 
-    mkdirSync('tmp', { recursive: true });
-    writeFileSync('tmp/golden-ts-reference.json', JSON.stringify(out, null, 2));
+    if (process.env.SOURCERER_DUMP_RUST_REFERENCE === '1') {
+      mkdirSync('tmp', { recursive: true });
+      writeFileSync('tmp/golden-ts-reference.json', JSON.stringify(out, null, 2));
+    }
 
     expect(golden).toHaveLength(15);
     expect(adversarial).toHaveLength(11);

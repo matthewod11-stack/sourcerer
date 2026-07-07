@@ -2,7 +2,7 @@
 
 export function showHelp(): void {
   console.log(`
-sourcerer — AI-powered talent sourcing agent
+sourcerer - AI-powered talent sourcing agent
 
 Usage: sourcerer <command> [options]
 
@@ -13,8 +13,6 @@ Commands:
   run           Execute a full pipeline run
   replay        Re-score a saved run without discovery/enrichment
   eval          Run golden-set scoring evaluation
-  discover      Run discovery phase only
-  enrich        Run enrichment phase only
   score         Run scoring phase only
   results       View results from last run
   runs          List previous runs

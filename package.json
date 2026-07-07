@@ -8,12 +8,12 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "build": "turbo build",
-    "eval": "pnpm --filter @sourcerer/cli build && node apps/cli/dist/index.js eval --mock",
-    "test": "turbo test",
-    "lint": "turbo lint",
+    "build": "tsc -b",
+    "eval": "tsc -b apps/cli && node apps/cli/dist/index.js eval --mock",
+    "test": "vitest run",
+    "lint": "eslint apps/cli/src packages/core/src packages/intake/src packages/ai/src packages/scoring/src packages/eval/src packages/adapters/adapter-exa/src packages/adapters/adapter-github/src packages/adapters/adapter-hunter/src packages/adapters/adapter-x/src packages/output/output-csv/src packages/output/output-json/src packages/output/output-markdown/src packages/output/output-notion/src",
     "dev": "turbo dev",
-    "typecheck": "turbo typecheck",
+    "typecheck": "tsc -b",
     "clean": "turbo clean"
   },
   "devDependencies": {

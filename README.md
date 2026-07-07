@@ -2,7 +2,7 @@
 
 AI-powered talent sourcing agent. Run an intelligent intake conversation, discover candidates across multiple data sources, enrich and score them with full evidence transparency, and push results to your existing workflow tools.
 
-<!-- ![Sourcerer CLI](docs/screenshots/cli.png) -->
+See [the no-key demo transcript](docs/demo.md) for a quick tour of the CLI and eval output.
 
 ## About
 
@@ -19,7 +19,7 @@ sourcerer run --intake  Run the full pipeline:
        |
    [ Intake ]           Conversational role profiling
        |
-   [ Discover ]         Exa semantic search + find_similar
+   [ Discover ]         Exa semantic search + seed-based find_similar
        |
    [ Dedup ]            Identity resolution across sources
        |
@@ -35,7 +35,7 @@ sourcerer results       View and re-export results
 ## Features
 
 - **Intelligent intake** -- conversational onboarding that builds a talent profile, search config, and similarity seeds from role descriptions, company URLs, and team member profiles
-- **Multi-source discovery** -- Exa-powered semantic search with tiered queries and `find_similar` expansion
+- **Multi-source discovery** -- Exa-powered semantic search with tiered queries and success-profile `find_similar` seeds
 - **Identity resolution** -- confidence-based deduplication across data sources with stable canonical IDs
 - **Evidence-grounded scoring** -- LLM signal extraction constrained to cite only canonical evidence items
 - **Pipeline checkpoints** -- interrupt and resume mid-run without losing progress
@@ -48,10 +48,10 @@ sourcerer results       View and re-export results
 | Technology    | Role                                       |
 | ------------- | ------------------------------------------ |
 | TypeScript    | Language (strict mode, ESM throughout)     |
-| Turborepo     | Monorepo build orchestration               |
+| Turborepo     | Monorepo task orchestration                |
 | Node.js       | Runtime                                    |
 | pnpm          | Package manager (workspace protocol)       |
-| Vitest        | Test runner (570 tests across 13 packages) |
+| Vitest        | Test runner (793 passing tests across 14 packages, 1 live smoke skipped by default) |
 | Exa           | Candidate discovery (semantic search)      |
 | GitHub API    | Code signal enrichment                     |
 | X/Twitter API | Social signal enrichment                   |
@@ -87,6 +87,7 @@ sourcerer/
 # Clone and install
 git clone https://github.com/matthewod11-stack/sourcerer.git
 cd sourcerer
+corepack enable
 pnpm install
 
 # Build all packages
@@ -114,14 +115,16 @@ pnpm eval
 pnpm --filter @sourcerer/cli start score --batch --mock
 ```
 
+No API keys are needed for `pnpm test`, `pnpm eval`, or `pnpm --filter @sourcerer/cli start score --batch --mock`. Live discovery and enrichment require adapter keys in `~/.sourcerer/config.yaml`.
+
 ### Prompt Iteration
 
-Use `sourcerer replay <run-id-or-dir>` when you want to iterate on scoring prompts without spending discovery or enrichment quota again. Replay loads the source run's saved `candidates.json`, re-runs only the scoring phase with the current prompts, and writes the result to a new run directory so the original run stays intact.
+Use `pnpm --filter @sourcerer/cli start replay <run-id-or-dir>` when you want to iterate on scoring prompts without spending discovery or enrichment quota again. Replay loads the source run's saved `candidates.json`, re-runs only the scoring phase with the current prompts, and writes the result to a new run directory so the original run stays intact.
 
 The AI response cache is still honored during replay. To intentionally bust only the scoring cache while testing a prompt variant, pass a namespace:
 
 ```bash
-sourcerer replay <run-id-or-dir> --prompt-version v3
+pnpm --filter @sourcerer/cli start replay <run-id-or-dir> --prompt-version v3
 ```
 
 ### Batch Scoring Spike
@@ -129,8 +132,8 @@ sourcerer replay <run-id-or-dir> --prompt-version v3
 Phase 6 adds an experimental golden-set comparison path for 1M-context batch scoring:
 
 ```bash
-sourcerer score --batch --mock
-sourcerer score --batch --model claude-opus-4-7
+pnpm --filter @sourcerer/cli start score --batch --mock
+pnpm --filter @sourcerer/cli start score --batch --model claude-opus-4-7
 ```
 
 The command compares the existing per-candidate scoring baseline against a single-call batch scoring prompt and writes JSON/Markdown reports under `eval-results/`. Use `--mock` for no-key/no-cost smoke checks; omit it only when intentionally spending provider quota.
@@ -156,14 +159,14 @@ Candidate artifacts may contain PII including emails, phone numbers, addresses w
 The default PII retention TTL is 90 days unless changed during `sourcerer init` or in `~/.sourcerer/config.yaml`. To redact expired local PII, run:
 
 ```bash
-sourcerer candidates purge --expired
+pnpm --filter @sourcerer/cli start candidates purge --expired
 ```
 
 At-rest encryption is not implemented yet. Do not run Sourcerer on shared machines, shared workspaces, synced folders, or multi-user servers unless you add disk-level protection and access controls outside the app. Remote copies pushed to tools like Notion are not affected by local purge commands.
 
 ### Model Selection
 
-Sourcerer uses Anthropic Sonnet 4.6 (`claude-sonnet-4-6`) by default for per-candidate scoring — fast, cheap, and high-quality enough for the structured-output workload. Override per-run by setting `aiProvider.model` in `~/.sourcerer/config.yaml`. The current defaults are visible at any time via `sourcerer config status`.
+Sourcerer uses Anthropic Sonnet 4.6 (`claude-sonnet-4-6`) by default for per-candidate scoring -- fast, cheap, and high-quality enough for the structured-output workload. Override per-run by setting `aiProvider.model` in `~/.sourcerer/config.yaml`. The current defaults are visible at any time via `pnpm --filter @sourcerer/cli start config status`.
 
 | Model               | When to pick it                                                                        |
 | ------------------- | -------------------------------------------------------------------------------------- |
@@ -176,19 +179,16 @@ OpenAI provider also supported (`aiProvider.name: openai`); current default is `
 ## Development
 
 ```bash
-pnpm build        # Build all packages (topological order)
-pnpm test         # Run all tests
-pnpm typecheck    # Type-check all packages
-pnpm lint         # Lint all packages
-pnpm clean        # Remove build artifacts
+pnpm build        # Build all packages through TypeScript project references
+pnpm test         # Run all Vitest projects
+pnpm typecheck    # Type-check all package references
+pnpm lint         # Lint all source directories
+pnpm eval         # Run the deterministic mock golden-set eval
+pnpm clean        # Remove build artifacts through package clean tasks
 ```
 
-Turborepo handles the build graph automatically. `core` builds first, then all other packages in parallel, then `cli` last.
+TypeScript project references define the package graph. Turborepo remains configured for package task orchestration, but the root verification gates call TypeScript, Vitest, and ESLint directly so they do not depend on an ambient global package-manager binary.
 
 ## License
 
 [MIT](LICENSE)
-
----
-
-Built with [Claude Code](https://claude.ai/code)
