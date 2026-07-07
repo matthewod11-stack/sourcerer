@@ -162,7 +162,7 @@ The default PII retention TTL is 90 days unless changed during `sourcerer init` 
 pnpm --filter @sourcerer/cli start candidates purge --expired
 ```
 
-At-rest encryption is not implemented yet. Do not run Sourcerer on shared machines, shared workspaces, synced folders, or multi-user servers unless you add disk-level protection and access controls outside the app. Remote copies pushed to tools like Notion are not affected by local purge commands.
+At-rest encryption is not implemented yet. Do not run Sourcerer on shared machines, shared workspaces, synced folders, or multi-user servers unless you add disk-level protection and access controls outside the app. Remote copies pushed to tools like Notion are not affected by local purge commands. The proposed implementation path is documented in [`docs/security/run-artifact-encryption-design.md`](docs/security/run-artifact-encryption-design.md).
 
 ### Model Selection
 
